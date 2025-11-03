@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+tests/
+notebooks/
+data/raw/*
+data/processed/*
+data/output/*
