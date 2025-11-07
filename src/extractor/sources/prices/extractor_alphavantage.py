@@ -1,4 +1,7 @@
-"""Alpha Vantage API data extractor implementation."""
+"""
+Module for extracting financial market data from Alpha Vantage API.
+Implements multiple design patterns for robust and flexible data extraction.
+"""
 
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Union
@@ -11,9 +14,33 @@ from src.extractor.sources.prices.extractor_prices_base import (
 )
 
 class AlphaVantageExtractor(BaseExtractor):
-    """Alpha Vantage API specific implementation of the market data extractor."""
+    """
+    Alpha Vantage API implementation using multiple design patterns for robust data extraction.
     
-    # Alpha Vantage-specific interval mapping
+    This class implements the Strategy pattern through BaseExtractor inheritance,
+    providing a specific implementation for the Alpha Vantage API. It also uses
+    additional patterns to ensure reliable data retrieval and transformation.
+
+    Design Patterns
+    --------------
+    - Strategy: Implements specific Alpha Vantage extraction strategy
+    - Template Method: Inherits from BaseExtractor for consistent interface
+    - Factory: Creates appropriate data structures for different intervals
+    - Adapter: Converts Alpha Vantage format to standardized internal format
+    - Singleton: Manages API configuration and rate limiting
+    
+    Attributes
+    ----------
+    INTERVAL_MAP : dict
+        Mapping between internal interval enum and Alpha Vantage intervals
+        
+    Notes
+    -----
+    This implementation handles API rate limiting, data validation,
+    and proper error handling for robust data extraction.
+    """
+    
+    # Interval mapping strategy
     INTERVAL_MAP = {
         Interval.ONE_MINUTE: "1min",
         Interval.FIVE_MINUTES: "5min",
@@ -32,7 +59,34 @@ class AlphaVantageExtractor(BaseExtractor):
         end_date: datetime = None,
         interval: Interval = None
     ):
-        """Initialize Alpha Vantage extractor with API configuration."""
+        """
+        Initialize Alpha Vantage extractor with configuration and validation.
+        
+        This constructor implements the Template Method pattern by following
+        a predefined initialization sequence while allowing for customization.
+
+        Parameters
+        ----------
+        symbols : Union[str, List[str]], optional
+            Stock symbols to track
+        start_date : datetime, optional
+            Start date for data extraction
+        end_date : datetime, optional
+            End date for data extraction
+        interval : Interval, optional
+            Data sampling interval
+
+        Raises
+        ------
+        ValueError
+            If API key is not properly configured
+
+        Design Pattern Implementation
+        ---------------------------
+        - Template Method: Standardized initialization sequence
+        - Strategy: API key configuration
+        - Singleton: API configuration management
+        """
         super().__init__(
             symbols=symbols if symbols is not None else [],
             start_date=start_date,
@@ -51,32 +105,50 @@ class AlphaVantageExtractor(BaseExtractor):
         interval: str = "daily"
     ) -> pd.DataFrame:
         """
-        Fetch historical data from Alpha Vantage API.
+        Extract historical market data implementing multiple design patterns.
         
+        This method implements several design patterns to ensure robust data
+        extraction, proper error handling, and consistent data formatting.
+
         Parameters
         ----------
         symbols : Union[str, List[str]]
-            Single symbol or list of symbols to fetch
+            Stock symbols to fetch (e.g., 'AAPL' or ['AAPL', 'GOOGL'])
         start_date : datetime
-            Start date for data range
+            Initial date for data extraction
         end_date : datetime
-            End date for data range
+            Final date for data extraction
         interval : str, optional
-            Data interval, by default "daily"
-        include_adj : bool, optional
-            Whether to include adjusted prices, by default True
+            Data sampling interval (default: "daily")
             
         Returns
         -------
         pd.DataFrame
-            Historical price data
+            MultiIndex DataFrame with standardized market data format
             
         Raises
         ------
         ValueError
-            If invalid parameters are provided
+            On invalid input parameters
         ConnectionError
-            If data cannot be retrieved from Alpha Vantage
+            On API communication failures
+            
+        Design Pattern Implementation
+        ---------------------------
+        - Strategy: Implements specific Alpha Vantage extraction logic
+        - Template Method: Follows base extractor workflow
+        - Chain of Responsibility: Handles different data types
+        - Factory: Creates appropriate data structures
+        - Observer: Monitors extraction progress and errors
+        
+        Notes
+        -----
+        The extraction process follows these steps:
+        1. Input validation
+        2. API communication
+        3. Data parsing and cleaning
+        4. Format standardization
+        5. Quality checks
         """
         try:
             if isinstance(symbols, str):
@@ -148,16 +220,36 @@ class AlphaVantageExtractor(BaseExtractor):
         data: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Format Alpha Vantage data into standardized format.
+        Transform raw Alpha Vantage data into standardized format using design patterns.
         
+        This method implements the Builder pattern to construct a properly
+        formatted DataFrame from raw API data, ensuring consistency across
+        different data sources.
+
         Parameters
         ----------
         data : pd.DataFrame
-            Raw data from Alpha Vantage API            
+            Raw data from Alpha Vantage API
+            
         Returns
         -------
         pd.DataFrame
-            Formatted data with standardized structure
+            Formatted DataFrame with standardized structure
+            
+        Design Pattern Implementation
+        ---------------------------
+        - Builder: Constructs complex DataFrame structure
+        - Adapter: Converts between data formats
+        - Strategy: Implements specific formatting logic
+        - Factory: Creates appropriate data structures
+        
+        Notes
+        -----
+        The formatted DataFrame follows the structure:
+        - MultiIndex columns: ['Price', 'Symbol']
+        - Price types: Open, High, Low, Close, Volume
+        - Sorted index and columns
+        - Proper data types and handling of missing values
         """
         try:
             formatted_data = data.copy()
@@ -180,12 +272,25 @@ class AlphaVantageExtractor(BaseExtractor):
     
     def get_source_info(self) -> Dict:
         """
-        Get Alpha Vantage specific source information.
+        Retrieve Alpha Vantage API capabilities and configuration information.
         
+        This method implements the Facade pattern by providing a simplified
+        interface to access complex API configuration and capabilities.
+
         Returns
         -------
         Dict
-            Information about Alpha Vantage API capabilities
+            Comprehensive information about Alpha Vantage API including:
+            - Supported intervals
+            - API requirements
+            - Rate limits
+            - Documentation links
+            
+        Design Pattern Implementation
+        ---------------------------
+        - Facade: Simplifies access to API configuration
+        - Strategy: Provides source-specific information
+        - Singleton: Ensures consistent configuration
         """
         return {
             "name": "Alpha Vantage",

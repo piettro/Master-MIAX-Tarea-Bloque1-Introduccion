@@ -1,83 +1,145 @@
 """
-Quickstart: Demonstração do processo completo de análise de portfolio.
-Inclui download de dados, criação de séries temporais, montagem de portfolio
-e geração de relatórios de análise.
+Quickstart: Returns-Based Monte Carlo Portfolio Analysis
+
+This module demonstrates a comprehensive portfolio analysis workflow using
+Monte Carlo simulation focused on returns distribution. It implements
+multiple design patterns for robust and flexible analysis.
+
+Design Patterns:
+    - Strategy: Returns simulation methodology
+    - Template Method: Standardized analysis process
+    - Factory Method: Component creation and management
+    - Observer: Data monitoring and collection
+    - Chain of Responsibility: Analysis pipeline
+    - Builder: Report construction
+    
+Key Features:
+    - Returns-based simulation
+    - Market data extraction
+    - Portfolio construction
+    - Statistical analysis
+    - Risk assessment
+    - Report generation
+
+Technical Process:
+    1. Data acquisition setup
+    2. Portfolio initialization
+    3. Returns calculation
+    4. Monte Carlo simulation
+    5. Analysis and reporting
+    
+Components:
+    - Market Data Extractor: Price data retrieval
+    - Portfolio: Asset management
+    - Monte Carlo Returns: Returns simulation
+    - Report Generator: Results presentation
 """
 
 from datetime import datetime
 import pandas as pd
-from src.analysis.entities.monte_carlo_portfolios import MonteCarloPortfolio
-from src.analysis.entities.monte_carlo_returns import MonteCarloRetorno
-from src.core.entities.price_series import PriceSeries
+from src.analysis.entities.monte_carlo_returns import MonteCarloReturn
 from src.core.entities.portfolio import Portfolio
-from src.extractor.prices_extractor import MarketDataExtractor
 from src.extractor.sources.prices.extractor_prices_base import Interval, DataSource
 from src.reports.report_monte_carlo import MonteCarloReport
-from src.reports.report_portfolio import PortfolioReport
-from src.reports.report_price_series import PriceSeriesReport
 
 def main():
-    """Função principal com o fluxo completo de análise."""
+    """
+    Execute the complete returns-based Monte Carlo analysis workflow.
+    
+    This function implements multiple design patterns to orchestrate
+    the entire analysis process from data acquisition to report generation,
+    with a focus on returns-based simulation.
+    
+    Design Pattern Implementation:
+        - Strategy: Returns simulation methodology
+        - Template Method: Analysis workflow standardization
+        - Factory Method: Object creation and management
+        - Observer: Progress and data monitoring
+        - Chain of Responsibility: Analysis pipeline
+        
+    Process Flow:
+        1. Configuration setup
+        2. Data extraction
+        3. Returns calculation
+        4. Monte Carlo simulation
+        5. Report generation
+        
+    Error Handling:
+        - Exception management
+        - Process validation
+        - Error reporting
+    """
     try:
+        # Complete market coverage example (commented for demonstration)
         '''
         symbols = [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META',  # Tech
-            'JPM', 'BAC', 'WFC', 'GS', 'MS',          # Financials
-            'JNJ', 'PFE', 'UNH', 'MRK', 'ABBV',       # Healthcare
-            'XOM', 'CVX', 'COP', 'SLB', 'EOG',        # Energy
-            'PG', 'KO', 'PEP', 'WMT', 'COST'          # Consumer
+            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META',  # Technology sector
+            'JPM', 'BAC', 'WFC', 'GS', 'MS',          # Financial sector
+            'JNJ', 'PFE', 'UNH', 'MRK', 'ABBV',       # Healthcare sector
+            'XOM', 'CVX', 'COP', 'SLB', 'EOG',        # Energy sector
+            'PG', 'KO', 'PEP', 'WMT', 'COST'          # Consumer sector
         ]
         '''
+        # Selected symbols for demonstration (diversified portfolio)
         symbols = [
-            'MSFT',
-            'WFC',
-            'SLB',
-            'PFE',
-            'COST'
+            'MSFT',  # Technology representation
+            'WFC',   # Financial sector
+            'SLB',   # Energy sector
+            'PFE',   # Healthcare sector
+            'COST'   # Consumer sector
         ]
         
-        start_date = datetime(2000, 1, 1)
-        end_date = datetime(2025, 11, 5)
-        source = DataSource.YAHOO
+        # Configure analysis parameters using Strategy pattern
+        start_date = datetime(2000, 1, 1)  # Long-term historical data
+        end_date = datetime(2025, 11, 5)   # Current date
+        source = DataSource.YAHOO          # Market data source
 
+        # Create portfolio using Factory and Builder patterns
         portfolio = Portfolio(
-            name='Quickstart Portfolio',
-            holdings=symbols,
-            quantity=1000,
-            start_date=start_date,
-            end_date=end_date,
-            source=source,
-            interval=Interval.MONTHLY
+            name='Quickstart Portfolio',    # Portfolio identifier
+            holdings=symbols,               # Selected market symbols
+            quantity=1000,                  # Standard position size
+            start_date=start_date,          # Historical start date
+            end_date=end_date,             # Analysis end date
+            source=source,                 # Data source strategy
+            interval=Interval.MONTHLY      # Return calculation frequency
         )
         
+        # Retrieve historical price data using Strategy pattern
         data = portfolio.get_prices()
         print(data)
 
-        # Exibir algumas informações básicas
-        print("\nResumo dos dados:")
-        print(f"Período: {data.index.min()} até {data.index.max()}")
-        print(f"Número de ativos: {len(symbols)}")
-        print(f"Número de observações: {len(data)}")
+        # Display analysis parameters using Observer pattern
+        print("\nAnalysis Configuration:")
+        print(f"Time Period: {data.index.min()} to {data.index.max()}")
+        print(f"Portfolio Size: {len(symbols)} assets")
+        print(f"Sample Size: {len(data)} observations")
         
-        print("\nPrimeiras linhas dos dados:")
+        print("\nHistorical Price Sample:")
         print(data.head())
 
-        # Calcular estatísticas e métricas
-        monte_carlo_portfolio = MonteCarloRetorno(
-            portfolio=portfolio
+        # Initialize returns-based Monte Carlo simulation using Strategy pattern
+        monte_carlo_portfolio = MonteCarloReturn(
+            portfolio=portfolio  # Target portfolio for returns analysis
         )
 
+        # Execute simulation using Template Method pattern
         monte_carlo_portfolio.run()
+        
+        # Generate analysis report using Builder pattern
         report = MonteCarloReport(
-            simulacao=monte_carlo_portfolio,
-            titulo="Monte Carlo Simulation Returns - Quickstart Portfolio"
+            simulation=monte_carlo_portfolio,
+            title="Monte Carlo Simulation Returns - Quickstart Portfolio"
         )
+
+        # Generate comprehensive report using Chain of Responsibility
         report.generate()
 
-        
     except Exception as e:
-        print(f"\nErro durante a execução: {str(e)}")
+        # Handle errors using Chain of Responsibility pattern
+        print(f"\nExecution Error: {str(e)}")
         raise
 
 if __name__ == "__main__":
+    # Execute main analysis workflow
     main()

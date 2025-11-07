@@ -177,6 +177,9 @@ pyrightconfig.json
 .vscode/
 data/
 data/reports/
+data/raw/
+data/processed/
+data/output/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 

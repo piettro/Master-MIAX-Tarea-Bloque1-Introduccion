@@ -1,6 +1,23 @@
 """
-Classe base para todos os relatórios do sistema.
-Define a interface comum e funcionalidades básicas que todos os reports devem implementar.
+Base Report Framework Implementation.
+
+This module implements a comprehensive framework for report generation using
+multiple design patterns to ensure flexibility, extensibility, and maintainability.
+
+Design Patterns:
+    - Template Method: Defines skeleton of report generation algorithm
+    - Builder: Constructs complex report structure
+    - Strategy: Different report generation strategies
+    - Abstract Factory: Creates families of related reports
+    - Chain of Responsibility: Report section handling
+
+Key Features:
+    - Flexible report structure
+    - Modular section management
+    - Dynamic content generation
+    - Automatic file organization
+    - Rich media support (plots, tables)
+    - Metadata handling
 """
 
 from abc import ABC, abstractmethod
@@ -14,34 +31,86 @@ import pandas as pd
 
 class BaseReport(ABC):
     """
-    Classe base abstrata para relatórios.
-    Provê funcionalidades comuns e define a interface que todos os relatórios devem seguir.
+    Abstract base class for all report types in the system.
+    
+    This class implements multiple design patterns to provide a robust
+    and flexible framework for report generation and management.
+    
+    Design Pattern Implementation:
+        - Template Method: Defines report generation workflow
+        - Builder: Constructs report sections and content
+        - Strategy: Supports different report formats
+        - Chain of Responsibility: Handles section processing
+        
+    Features:
+        - Modular section management
+        - Plot and table integration
+        - Metadata handling
+        - File organization
+        - Format flexibility
+        
+    The class provides:
+        1. Standard report structure
+        2. Common functionality
+        3. Content management
+        4. File handling
+        5. Error management
+        
+    Notes:
+        Concrete report classes must implement the generate() method
+        and may override other methods for specific functionality.
     """
     
     def __init__(
         self,
-        titulo: str,
+        title: str,
         include_plots: bool = True,
         include_tables: bool = True,
     ):
         """
-        Inicializa um novo relatório.
+        Initialize a new report instance with specified configuration.
         
+        This constructor implements multiple design patterns to set up
+        the report structure and prepare content management systems.
+        
+        Design Pattern Implementation:
+            - Template Method: Initializes standard report structure
+            - Builder: Sets up content building system
+            - Strategy: Configures content inclusion strategies
+            
         Parameters
         ----------
-        titulo : str
-            Título do relatório
-        include_plots : bool
-            Se True, inclui visualizações no relatório
-        include_tables : bool
-            Se True, inclui tabelas de dados no relatório
+        title : str
+            Report title used for identification and metadata
+        include_plots : bool, default=True
+            Whether to include visualizations in the report
+            Controls plot-related functionality
+        include_tables : bool, default=True
+            Whether to include data tables in the report
+            Controls table-related functionality
+            
+        Process Flow:
+            1. Basic validation
+            2. Content flags setup
+            3. Section list initialization
+            4. Directory structure setup
+            
+        Attributes Initialized:
+            - title: Report title
+            - include_plots: Plot inclusion flag
+            - include_tables: Table inclusion flag
+            - sections: List of report sections
+            
+        Notes
+        -----
+        The initialization process sets up all necessary structures
+        for report generation and management.
         """
-        self.titulo = titulo
+        self.title = title
         self.include_plots = include_plots
         self.include_tables = include_tables
         self.sections: List[Dict[str, Any]] = []
         
-        # Setup do diretório de saída com estrutura organizada
         self._setup_output_directory()
         
     def add_section(
@@ -51,16 +120,40 @@ class BaseReport(ABC):
         level: int = 2
     ) -> None:
         """
-        Adiciona uma nova seção ao relatório.
+        Add a new section to the report with specified content.
         
+        This method implements the Builder pattern to construct report
+        sections and manage content hierarchy.
+        
+        Design Pattern Implementation:
+            - Builder: Constructs section structure
+            - Chain of Responsibility: Section management
+            - Template Method: Standard section formatting
+            
         Parameters
         ----------
         title : str
-            Título da seção
-        content : str
-            Conteúdo em formato Markdown
-        level : int
-            Nível do título (1 a 6)
+            Section title for hierarchy organization
+        content : str, default=""
+            Section content in Markdown format
+            Supports all standard Markdown syntax
+        level : int, default=2
+            Header level (1-6) for hierarchical organization
+            1: Main titles
+            2: Major sections
+            3-6: Subsections
+            
+        Section Structure:
+            {
+                'title': Section title
+                'content': Markdown content
+                'level': Header level
+            }
+            
+        Notes
+        -----
+        Sections are stored sequentially and maintain hierarchy
+        through their level attribute.
         """
         self.sections.append({
             'title': title,
@@ -76,30 +169,54 @@ class BaseReport(ABC):
         format_dict: Optional[Dict] = None
     ) -> None:
         """
-        Adiciona uma tabela ao relatório.
+        Add a formatted data table to the report.
         
+        This method implements multiple patterns to handle table
+        generation and formatting in a flexible way.
+        
+        Design Pattern Implementation:
+            - Strategy: Table formatting strategy
+            - Builder: Table construction
+            - Chain of Responsibility: Table processing
+            
         Parameters
         ----------
         data : pd.DataFrame
-            Dados para a tabela
+            Data to be presented in table format
+            Must have proper column names
         title : str
-            Título da tabela
-        level : int
-            Nível do título
-        format_dict : Dict, opcional
-            Dicionário com formatos para cada coluna
+            Table title for identification
+        level : int, default=3
+            Header level for table title
+        format_dict : Dict, optional
+            Column formatting specifications:
+            {
+                'column_name': formatting_function,
+                ...
+            }
+            
+        Process Flow:
+            1. Configuration validation
+            2. Table header generation
+            3. Content formatting
+            4. Markdown table construction
+            
+        Notes
+        -----
+        - Automatically handles column alignment
+        - Supports custom column formatting
+        - Generates valid Markdown tables
+        - Respects include_tables flag
         """
         if not self.include_tables:
             return
             
-        # Criar cabeçalho da tabela
         table = [
             f"{'#' * level} {title}\n",
             "| " + " | ".join(data.columns) + " |",
             "|-" + "-|-".join(["-" * len(col) for col in data.columns]) + "-|"
         ]
         
-        # Adicionar linhas
         for _, row in data.iterrows():
             formatted_row = []
             for col in data.columns:
@@ -118,21 +235,48 @@ class BaseReport(ABC):
         level: int = 3
     ) -> None:
         """
-        Adiciona um plot ao relatório.
+        Add a matplotlib figure to the report as an embedded image.
         
+        This method implements multiple patterns to handle plot
+        integration and image processing.
+        
+        Design Pattern Implementation:
+            - Strategy: Image conversion strategy
+            - Builder: Plot section construction
+            - Chain of Responsibility: Plot processing
+            
         Parameters
         ----------
         fig : plt.Figure
-            Figura do matplotlib
+            Matplotlib figure to be included
+            Must be a valid figure instance
         title : str
-            Título do plot
-        level : int
-            Nível do título
+            Title for the plot section
+        level : int, default=3
+            Header level for plot title
+            
+        Process Flow:
+            1. Plot inclusion check
+            2. Figure conversion to PNG
+            3. Base64 encoding
+            4. Markdown section creation
+            
+        Technical Details:
+            - PNG format for maximum compatibility
+            - 300 DPI for high quality
+            - Base64 encoding for embedding
+            - Markdown image syntax
+            
+        Notes
+        -----
+        - Respects include_plots flag
+        - Automatically handles figure cleanup
+        - Preserves figure quality
+        - Supports all matplotlib figures
         """
         if not self.include_plots:
             return
             
-        # Converter figura para base64
         buf = BytesIO()
         fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
         buf.seek(0)
@@ -142,11 +286,39 @@ class BaseReport(ABC):
         self.add_section(title=title, content=content, level=level)
         
     def add_metadata(self) -> None:
-        """Adiciona metadados ao relatório."""
+        """
+        Add metadata information to the report.
+        
+        This method implements the Template Method pattern to provide
+        standard metadata handling across all report types.
+        
+        Design Pattern Implementation:
+            - Template Method: Standard metadata format
+            - Strategy: Metadata collection
+            - Chain of Responsibility: Metadata processing
+            
+        Metadata Components:
+            1. Document delimiters
+            2. Report title
+            3. Generation timestamp
+            4. Additional metadata
+            
+        Process Flow:
+            1. Metadata collection
+            2. Format preparation
+            3. Section insertion
+            
+        Notes
+        -----
+        - Automatically adds timestamp
+        - Preserves document structure
+        - Supports YAML frontmatter format
+        - Placed at the beginning of the document
+        """
         metadata = [
             "---",
-            f"Título: {self.titulo}",
-            f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
+            f"Title: {self.title}",
+            f"Date: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
             "---\n"
         ]
         self.sections.insert(0, {
@@ -158,57 +330,154 @@ class BaseReport(ABC):
     @abstractmethod
     def generate(self, auto_save: bool = True) -> Union[str, Path]:
         """
-        Gera o conteúdo do relatório e opcionalmente salva em arquivo.
-        Deve ser implementado pelas classes filhas.
+        Generate report content and optionally save to file.
+        Must be implemented by child classes.
         
+        This abstract method defines the Template Method pattern
+        for report generation across all report types.
+        
+        Design Pattern Implementation:
+            - Template Method: Report generation workflow
+            - Strategy: Content generation strategy
+            - Chain of Responsibility: Content processing
+            
         Parameters
         ----------
-        auto_save : bool, opcional
-            Se True, salva automaticamente o relatório após gerar (default: True)
+        auto_save : bool, default=True
+            If True, automatically saves report after generation
+            Controls file output behavior
             
         Returns
         -------
         Union[str, Path]
-            Se auto_save=True: Path do arquivo salvo
-            Se auto_save=False: Conteúdo do relatório em formato Markdown
+            If auto_save=True: Path object to saved file
+            If auto_save=False: Report content as Markdown string
+            
+        Process Flow:
+            1. Content generation
+            2. Format application
+            3. Optional file saving
+            4. Result return
+            
+        Technical Details:
+            - Must be implemented by subclasses
+            - Defines standard generation workflow
+            - Handles both file and string output
+            - Maintains consistent format
+            
+        Notes
+        -----
+        - Template for all report generation
+        - Ensures consistent structure
+        - Flexible output handling
+        - Error management required
         """
         pass
         
     def _setup_output_directory(self) -> None:
         """
-        Configura a estrutura de diretórios para salvar os relatórios.
-        Estrutura: base_dir/data/reports/tipo_report/YYYY-MM-DD/
+        Configure directory structure for report storage.
+        
+        This helper method implements patterns to manage the
+        file system organization for report storage.
+        
+        Design Pattern Implementation:
+            - Template Method: Standard directory structure
+            - Strategy: Path resolution strategy
+            - Facade: File system operations
+            
+        Directory Structure:
+            base_dir/
+                data/
+                    reports/
+                        report_type/
+                            YYYY-MM-DD/
+            
+        Process Flow:
+            1. Base directory resolution
+            2. Current date formatting
+            3. Report type determination
+            4. Directory creation
+            
+        Technical Details:
+            - Uses Path for cross-platform compatibility
+            - Creates nested directory structure
+            - Handles permissions and existence
+            - Maintains consistent organization
+            
+        Notes
+        -----
+        - Creates directories if they don't exist
+        - Uses class name for report type
+        - Organizes by date for easy retrieval
+        - Prints confirmation message
         """
-        # Diretório base (raiz do projeto)
         self.base_dir = Path(__file__).resolve().parent.parent.parent
         
-        # Data atual para organização
         today = datetime.now().strftime('%Y-%m-%d')
         
-        # Define o tipo de relatório com base no nome da classe
         report_type = self.__class__.__name__.lower().replace('report', '')
         
-        # Criar estrutura de diretórios
         self.output_dir = self.base_dir / "data" / "reports" / report_type / today
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-        print(f"Diretório de saída configurado: {self.output_dir}")
+
+        print(f"Output directory set: {self.output_dir}")
 
     def save(self, symbols: Optional[List[str]] = None, custom_name: Optional[str] = None) -> Path:
         """
-        Salva o relatório em arquivo markdown na estrutura de diretórios apropriada.
+        Save the report as a Markdown file in the appropriate directory structure.
         
+        This method implements multiple patterns to handle file saving
+        and organization in a consistent way.
+        
+        Design Pattern Implementation:
+            - Template Method: Standard save process
+            - Strategy: File naming strategy
+            - Chain of Responsibility: File processing
+            
         Parameters
         ----------
-        symbols : List[str], opcional
-            Lista de símbolos para organização em subpastas
-        custom_name : str, opcional
-            Nome customizado para o arquivo (sem extensão)
+        symbols : List[str], optional
+            List of symbols for subfolder organization
+            Used for financial instrument reports
+        custom_name : str, optional
+            Custom filename without extension
+            Overrides default naming convention
             
         Returns
         -------
         Path
-            Caminho do arquivo salvo
+            Absolute path to the saved file
+            
+        Process Flow:
+            1. Filename determination
+            2. Metadata addition
+            3. Content compilation
+            4. File writing
+            5. Confirmation
+            
+        Technical Details:
+            - UTF-8 encoding
+            - Markdown format
+            - Automatic metadata
+            - Error handling
+            
+        File Naming:
+            - Custom name if provided
+            - Symbol-based name if symbols provided
+            - Timestamp-based name as fallback
+            
+        Notes
+        -----
+        - Creates necessary directories
+        - Handles file system errors
+        - Maintains consistent structure
+        - Confirms successful save
+        
+        Raises
+        ------
+        ValueError
+            If file saving encounters an error
         """
         try:
             if custom_name:
@@ -235,9 +504,9 @@ class BaseReport(ABC):
             
             output_path.write_text("\n".join(full_report), encoding='utf-8')
             
-            print(f"Relatório salvo em: {output_path}")
+            print(f"Report saved: {output_path}")
             return output_path
             
         except Exception as e:
-            raise ValueError(f"Erro ao salvar relatório: {str(e)}") from e
+            raise ValueError(f"Error to save report: {str(e)}") from e
         

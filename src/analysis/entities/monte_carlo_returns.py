@@ -1,124 +1,123 @@
 """
-Monte Carlo simulation: portfolio return scenarios (log-based).
+Monte Carlo Simulation: portfolio return scenarios (log-based).
 """
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
+from typing import Optional
 from src.analysis.entities.monte_carlo_base import MonteCarloBase
 
-
-class MonteCarloRetorno(MonteCarloBase):
+class MonteCarloReturn(MonteCarloBase):
     """
-    Simulação de Monte Carlo com retornos logarítmicos (log-based),
-    mantendo os pesos fixos definidos no portfólio.
+    Monte Carlo simulation using log-based returns while keeping
+    portfolio weights fixed.
 
-    Nesta simulação, a incerteza vem da geração de retornos,
-    não da variação dos pesos.
+    In this simulation, uncertainty comes from the generation of
+    simulated returns rather than weight variation.
     """
 
     def __init__(
         self,
         portfolio,
-        n_simulacoes: int = 10,
-        taxa_livre_risco: float = 0.0,
-        capital_inicial: float = 10000.0,
-        seed: int = None
+        n_simulations: int = 10,
+        risk_free_rate: float = 0.0,
+        initial_capital: float = 10000.0,
+        seed: Optional[int] = None,
     ):
         """
-        Parâmetros
-        ----------
-        portfolio : Portfolio
-            Instância da classe Portfolio, contendo os retornos históricos dos ativos.
-        n_simulacoes : int
-            Número de simulações a serem executadas.
-        taxa_livre_risco : float
-            Taxa livre de risco anualizada.
-        capital_inicial : float
-            Valor inicial do capital investido.
-        seed : int, opcional
-            Semente aleatória para reprodutibilidade.
+        Initializes the Monte Carlo Return simulation.
+
+        Args:
+            portfolio: Portfolio
+                Instance of the Portfolio class containing historical asset returns.
+            n_simulations: int, optional
+                Number of simulations to execute. Default is 10.
+            risk_free_rate: float, optional
+                Annualized risk-free rate. Default is 0.0.
+            initial_capital: float, optional
+                Initial invested capital. Default is 10,000.
+            seed: int, optional
+                Random seed for reproducibility. Default is None.
         """
         super().__init__(
             portfolio=portfolio,
-            n_simulacoes=n_simulacoes,
-            taxa_livre_risco=taxa_livre_risco,
-            seed=seed
+            n_simulations=n_simulations,
+            risk_free_rate=risk_free_rate,
+            seed=seed,
         )
 
-        self.capital_inicial = capital_inicial
-        self.retornos_historicos = self.portfolio.series.get_returns()
-        self.ativos = self.retornos_historicos.columns
-        self.n_ativos = len(self.ativos)
-        self.pesos = np.array(list(self.portfolio.weights().values()))
-        self.simulacoes: pd.DataFrame = pd.DataFrame(columns=["Retorno", "Valor", "Simulação"])
+        self.initial_capital = initial_capital
+        self.historical_returns = self.portfolio.series.get_returns()
+        self.assets = self.historical_returns.columns
+        self.n_assets = len(self.assets)
+        self.weights = np.array(list(self.portfolio.weights().values()))
+        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])
 
-    # --------------------------------------------------------------
-    # Método principal da simulação
-    # --------------------------------------------------------------
     def run(self) -> pd.DataFrame:
         """
-        Executa a simulação de Monte Carlo variando os retornos logarítmicos
-        dos ativos, mantendo os pesos fixos do portfólio.
-        
-        Returns:
-            pd.DataFrame: DataFrame com simulações expandidas contendo:
-                - Ativo: nome do ativo
-                - Data: data da simulação
-                - Peso: peso do ativo na carteira
-                - Valor: valor do ativo
-                - Valor Total: soma total da carteira
-                - Retorno: retorno do ativo
-                - Simulação: número da simulação
-        """
-        medias = self.retornos_historicos.mean()
-        cov = self.retornos_historicos.cov()
-        simulacoes_lista = []
+        Runs the Monte Carlo simulation by varying log-based asset returns,
+        keeping portfolio weights fixed.
 
-        for sim in range(self.n_simulacoes):
-            # Simular retornos logarítmicos
+        Returns:
+            pd.DataFrame: Expanded simulation results containing:
+                - Asset: asset name
+                - Date: simulation timestamp
+                - Weight: asset weight in the portfolio
+                - Value: asset value evolution
+                - Total Value: total portfolio value
+                - Return: asset return
+                - Simulation: simulation number
+        """
+        means = self.historical_returns.mean()
+        cov = self.historical_returns.cov()
+        simulation_results = []
+
+        for sim in range(self.n_simulations):
+            # Generate simulated log returns
             simulated_log_returns = np.random.multivariate_normal(
-                mean=medias, cov=cov, size=len(self.retornos_historicos)
+                mean=means, cov=cov, size=len(self.historical_returns)
             )
             simulated_returns = np.exp(simulated_log_returns) - 1
 
-            # Criar DataFrame de retornos
-            df_retornos = pd.DataFrame(
-                simulated_returns, 
-                columns=self.ativos,
-                index=self.retornos_historicos.index
+            # Create DataFrame of simulated returns
+            returns_df = pd.DataFrame(
+                simulated_returns,
+                columns=self.assets,
+                index=self.historical_returns.index,
             )
 
-            # Calcular valores e retornos para cada ativo
-            for ativo in self.ativos:
-                peso_ativo = self.pesos[list(self.ativos).index(ativo)]
-                valores_ativo = self.capital_inicial * peso_ativo * (1 + df_retornos[ativo]).cumprod()
-                retornos_ativo = df_retornos[ativo]
-                valor_total = self.capital_inicial * (1 + df_retornos).dot(self.pesos).cumprod()
+            # Compute asset and portfolio value evolution
+            for asset in self.assets:
+                asset_weight = self.weights[list(self.assets).index(asset)]
+                asset_returns = returns_df[asset]
 
-                # Criar DataFrame para o ativo atual
-                df_ativo = pd.DataFrame({
-                    'Ativo': ativo,
-                    'Data': df_retornos.index,
-                    'Peso': peso_ativo,
-                    'Valor': valores_ativo,
-                    'Valor Total': valor_total,
-                    'Retorno': retornos_ativo,
-                    'Simulação': sim + 1
+                asset_values = self.initial_capital * asset_weight * (1 + asset_returns).cumprod()
+                total_value = self.initial_capital * (1 + returns_df).dot(self.weights).cumprod()
+
+                asset_df = pd.DataFrame({
+                    "Asset": asset,
+                    "Date": returns_df.index,
+                    "Weight": asset_weight,
+                    "Value": asset_values,
+                    "Total Value": total_value,
+                    "Return": asset_returns,
+                    "Simulation": sim + 1,
                 })
 
-                simulacoes_lista.append(df_ativo)
+                simulation_results.append(asset_df)
 
-        # Consolidar todas as simulações em um único DataFrame
-        self.simulacoes = pd.concat(simulacoes_lista, ignore_index=True)
-        
-        # Calcular métricas agregadas por simulação
-        self.metricas_simulacoes = (self.simulacoes
-            .groupby('Simulação')
+        # Combine all simulations into one DataFrame
+        self.simulations = pd.concat(simulation_results, ignore_index=True)
+
+        # Compute aggregated metrics per simulation
+        self.simulation_metrics = (
+            self.simulations
+            .groupby("Simulation")
             .agg({
-                'Valor Total': lambda x: x.iloc[-1],
-                'Retorno': ['mean', 'std']
+                "Total Value": lambda x: x.iloc[-1],
+                "Return": ["mean", "std"],
             })
-            .round(4))
-        
-        return self.simulacoes
+            .round(4)
+        )
 
+        return self.simulations

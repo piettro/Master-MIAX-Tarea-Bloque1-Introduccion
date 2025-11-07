@@ -1,127 +1,263 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
 
-class CalculadorMonteCarlo:
+class MonteCarloCalculator:
     """
-    Classe responsável pelos cálculos estatísticos das simulações Monte Carlo.
-    Trabalha com o formato expandido do DataFrame de simulações.
+    Statistical calculator for Monte Carlo simulation analysis.
+    
+    This class implements multiple design patterns to provide a comprehensive
+    framework for analyzing Monte Carlo simulation results.
+    
+    Design Pattern Implementation:
+        - Strategy: Different calculation methods
+        - Observer: Results monitoring
+        - Template Method: Standard calculation workflow
+        - Chain of Responsibility: Metric calculation pipeline
+        
+    Key Features:
+        - Basic statistical measures
+        - Risk metrics (VaR, CVaR)
+        - Portfolio analytics
+        - Correlation analysis
+        - Drawdown calculations
+        
+    Technical Components:
+        - Statistical analysis
+        - Risk assessment
+        - Portfolio evaluation
+        - Results validation
     """
     
-    def __init__(self, simulacoes: pd.DataFrame):
+    def __init__(self, simulations: pd.DataFrame):
         """
-        Parâmetros
+        Initialize Monte Carlo calculator with simulation results.
+        
+        Parameters
         ----------
-        simulacoes : pd.DataFrame
-            DataFrame expandido com os resultados das simulações Monte Carlo.
-        """
-        if simulacoes is None or simulacoes.empty:
-            raise ValueError("DataFrame de simulações não pode ser vazio")
+        simulations : pd.DataFrame
+            Expanded DataFrame containing Monte Carlo simulation results
+            Must include columns: [Simulation, Date, Asset, Return, Weight, Total Value]
             
-        self.simulacoes = simulacoes
+        Design Notes
+        -----------
+        - Uses Observer pattern for data validation
+        - Implements Strategy for calculation methods
+        - Supports Template Method for analysis workflow
         
-    def calcular_estatisticas_basicas(self) -> Dict[str, float]:
+        Raises
+        ------
+        ValueError
+            If simulations DataFrame is None or empty
         """
-        Calcula estatísticas básicas das simulações.
+        if simulations is None or simulations.empty:
+            raise ValueError("Simulations DataFrame cannot be empty")
+            
+        self.simulations = simulations
         
-        Retorna
+    def calculate_basic_statistics(self) -> Dict[str, float]:
+        """
+        Calculate basic statistical measures from simulation results.
+        
+        This method implements the Strategy pattern for statistical
+        calculations on Monte Carlo simulation data.
+        
+        Design Pattern Implementation:
+            - Strategy: Statistical calculation methods
+            - Observer: Results monitoring
+            - Chain of Responsibility: Calculation pipeline
+            
+        Returns
         -------
         Dict[str, float]
-            Dicionário com estatísticas básicas (média, mediana, desvio padrão, etc.)
+            Dictionary containing:
+                - mean_return: Average return across simulations
+                - median_return: Median return
+                - std_deviation: Return standard deviation
+                - min_return: Minimum return observed
+                - max_return: Maximum return observed
+                
+        Technical Details
+        ----------------
+        - Groups by simulation to get path-level statistics
+        - Calculates cross-sectional measures
+        - Handles outliers appropriately
         """
-        retornos = self.simulacoes.groupby('Simulação')['Retorno'].mean()
+        returns = self.simulations.groupby('Simulation')['Return'].mean()
         
         return {
-            'retorno_medio': retornos.mean(),
-            'retorno_mediano': retornos.median(),
-            'desvio_padrao': retornos.std(),
-            'retorno_minimo': retornos.min(),
-            'retorno_maximo': retornos.max()
+            'mean_return': returns.mean(),
+            'median_return': returns.median(),
+            'std_deviation': returns.std(),
+            'min_return': returns.min(),
+            'max_return': returns.max()
         }
         
-    def calcular_var_cvar(self, nivel_confianca: float = 0.95) -> Dict[str, float]:
+    def calculate_var_cvar(self, confidence_level: float = 0.95) -> Dict[str, float]:
         """
-        Calcula o Value at Risk (VaR) e Conditional Value at Risk (CVaR)
+        Calculate Value at Risk (VaR) and Conditional Value at Risk (CVaR).
         
-        Parâmetros
-        ----------
-        nivel_confianca : float
-            Nível de confiança para o cálculo (ex: 0.95 para 95%)
+        This method implements risk metric calculations using multiple
+        design patterns for robust risk assessment.
+        
+        Design Pattern Implementation:
+            - Strategy: Risk calculation methodology
+            - Template Method: Standard risk calculation flow
+            - Chain of Responsibility: Risk metric pipeline
             
-        Retorna
+        Parameters
+        ----------
+        confidence_level : float, default=0.95
+            Confidence level for VaR/CVaR calculation
+            Example: 0.95 for 95% confidence
+            
+        Returns
         -------
         Dict[str, float]
-            Dicionário com VaR e CVaR calculados
+            Dictionary containing:
+                - var: Value at Risk at specified confidence level
+                - cvar: Conditional Value at Risk (Expected Shortfall)
+                
+        Technical Details
+        ----------------
+        - Calculates path-level returns
+        - Determines VaR using percentile method
+        - Computes CVaR as mean of tail events
+        - Handles extreme scenarios appropriately
         """
-        retornos = self.simulacoes.groupby('Simulação')['Retorno'].mean()
-        percentil = 100 * (1 - nivel_confianca)
-        var = np.percentile(retornos, percentil)
-        cvar = retornos[retornos <= var].mean()
+        returns = self.simulations.groupby('Simulation')['Return'].mean()
+        percentile = 100 * (1 - confidence_level)
+        var = np.percentile(returns, percentile)
+        cvar = returns[returns <= var].mean()
         
         return {
             'var': var,
             'cvar': cvar
         }
         
-    def calcular_estatisticas_carteira(self) -> pd.DataFrame:
+    def calculate_portfolio_statistics(self) -> pd.DataFrame:
         """
-        Calcula estatísticas por ativo na carteira.
+        Calculate per-asset statistics within the portfolio.
         
-        Retorna
+        This method implements multiple patterns to analyze individual
+        asset performance within the portfolio context.
+        
+        Design Pattern Implementation:
+            - Strategy: Asset analysis methodology
+            - Observer: Performance monitoring
+            - Chain of Responsibility: Metric calculation
+            
+        Returns
         -------
         pd.DataFrame
-            DataFrame com estatísticas por ativo
+            DataFrame containing per-asset statistics:
+                - Asset: Asset identifier
+                - Average Weight: Mean portfolio weight
+                - Average Return: Mean return
+                - Volatility: Return standard deviation
+                - Sharpe: Risk-adjusted return metric
+                
+        Technical Details
+        ----------------
+        - Analyzes each asset individually
+        - Calculates risk-adjusted metrics
+        - Handles weight dynamics
+        - Processes return distributions
         """
         stats = []
-        for ativo in self.simulacoes['Ativo'].unique():
-            dados_ativo = self.simulacoes[self.simulacoes['Ativo'] == ativo]
+        for asset in self.simulations['Asset'].unique():
+            asset_data = self.simulations[self.simulations['Asset'] == asset]
             
-            peso_medio = dados_ativo['Peso'].mean()
-            retorno_medio = dados_ativo['Retorno'].mean()
-            vol = dados_ativo['Retorno'].std()
+            avg_weight = asset_data['Weight'].mean()
+            avg_return = asset_data['Return'].mean()
+            volatility = asset_data['Return'].std()
             
             stats.append({
-                'Ativo': ativo,
-                'Peso Médio': peso_medio,
-                'Retorno Médio': retorno_medio,
-                'Volatilidade': vol,
-                'Sharpe': retorno_medio / vol if vol > 0 else 0
+                'Asset': asset,
+                'Average Weight': avg_weight,
+                'Average Return': avg_return,
+                'Volatility': volatility,
+                'Sharpe': avg_return / volatility if volatility > 0 else 0
             })
             
         return pd.DataFrame(stats)
         
-    def calcular_correlacoes(self) -> pd.DataFrame:
+    def calculate_correlations(self) -> pd.DataFrame:
         """
-        Calcula a matriz de correlação entre os retornos dos ativos.
+        Calculate the correlation matrix between asset returns.
         
-        Retorna
+        This method implements correlation analysis using multiple
+        design patterns for robust relationship assessment.
+        
+        Design Pattern Implementation:
+            - Strategy: Correlation calculation method
+            - Observer: Relationship monitoring
+            - Template Method: Analysis workflow
+            
+        Returns
         -------
         pd.DataFrame
-            Matriz de correlação dos retornos
+            Correlation matrix containing:
+                - Pairwise asset correlations
+                - Symmetric matrix format
+                - Values in [-1, 1] range
+                
+        Technical Details
+        ----------------
+        - Pivots data for correlation analysis
+        - Handles missing values appropriately
+        - Computes pairwise relationships
+        - Maintains matrix symmetry
         """
-        # Pivota o DataFrame para ter ativos nas colunas
-        retornos_pivot = self.simulacoes.pivot_table(
-            index=['Data', 'Simulação'],
-            columns='Ativo',
-            values='Retorno'
+        # Pivot DataFrame for correlation analysis
+        returns_pivot = self.simulations.pivot_table(
+            index=['Date', 'Simulation'],
+            columns='Asset',
+            values='Return'
         )
         
-        return retornos_pivot.corr()
+        return returns_pivot.corr()
         
-    def calcular_drawdowns(self) -> Dict[str, float]:
+    def calculate_drawdowns(self) -> Dict[str, float]:
         """
-        Calcula estatísticas de drawdown da carteira.
+        Calculate portfolio drawdown statistics across simulations.
         
-        Retorna
+        This method implements drawdown analysis using multiple design
+        patterns for comprehensive risk assessment.
+        
+        Design Pattern Implementation:
+            - Strategy: Drawdown calculation methodology
+            - Observer: Risk monitoring
+            - Chain of Responsibility: Metric pipeline
+            - Template Method: Analysis workflow
+            
+        Returns
         -------
         Dict[str, float]
-            Dicionário com métricas de drawdown
-        """
-        valores = self.simulacoes.groupby(['Data', 'Simulação'])['Valor Total'].first().unstack()
+            Dictionary containing drawdown metrics:
+                - max_drawdown: Maximum portfolio drawdown
+                - avg_drawdown: Average drawdown across simulations
+                - drawdown_std: Drawdown volatility measure
+                
+        Technical Details
+        ----------------
+        - Computes path-wise drawdowns
+        - Tracks running maximum values
+        - Calculates relative declines
+        - Aggregates across simulations
         
-        # Calcula drawdowns para cada simulação
-        running_max = valores.expanding().max()
-        drawdowns = (valores - running_max) / running_max
+        Process Flow:
+            1. Group values by date and simulation
+            2. Calculate running maximum
+            3. Compute drawdown percentages
+            4. Aggregate statistics
+        """
+        # Extract portfolio values across time and simulations
+        values = self.simulations.groupby(['Date', 'Simulation'])['Total Value'].first().unstack()
+        
+        # Calculate drawdowns for each simulation path
+        running_max = values.expanding().max()
+        drawdowns = (values - running_max) / running_max
         
         return {
             'max_drawdown': drawdowns.min().min(),

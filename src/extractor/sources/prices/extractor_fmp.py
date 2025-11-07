@@ -1,4 +1,24 @@
-"""Financial Modeling Prep (FMP) API data extractor implementation."""
+"""
+Financial Modeling Prep (FMP) API data extractor implementation.
+
+This module implements the Strategy Pattern through the BaseExtractor interface,
+providing a concrete strategy for fetching financial data from the FMP API.
+It also follows the Template Method pattern by implementing the abstract methods
+defined in the base class.
+
+Design Patterns:
+    - Strategy Pattern: Implements BaseExtractor interface to provide FMP-specific data extraction
+    - Template Method: Inherits and implements abstract methods from BaseExtractor
+    - Factory Method: Can be used as part of a factory to create different extractor instances
+    - Singleton Pattern (optional): Can be implemented to ensure single API connection
+
+Key Features:
+    - Historical price data retrieval from FMP API
+    - Support for multiple symbols
+    - Customizable date ranges
+    - Data format standardization
+    - Error handling and validation
+"""
 
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Union
@@ -14,9 +34,22 @@ from src.extractor.sources.prices.extractor_prices_base import (
 )
 
 class FMPExtractor(BaseExtractor):
-    """FMP API specific implementation of the market data extractor."""
+    """
+    Financial Modeling Prep (FMP) API specific implementation of the market data extractor.
     
-    # FMP-specific interval mapping
+    This class provides a concrete implementation of the BaseExtractor interface
+    for retrieving financial data from the Financial Modeling Prep API. It handles
+    authentication, data fetching, and format standardization.
+    
+    Design Pattern Implementation:
+        - Strategy: Concrete strategy for FMP API data extraction
+        - Template Method: Implements abstract methods from BaseExtractor
+        
+    Attributes:
+        INTERVAL_MAP (dict): Maps standard intervals to FMP-specific formats
+        _api_key (str): FMP API authentication key from environment variables
+    """
+    
     INTERVAL_MAP = {
         Interval.DAILY: "1day"
     }
@@ -28,7 +61,29 @@ class FMPExtractor(BaseExtractor):
         end_date: datetime = None,
         interval: Interval = None
     ):
-        """Initialize FMP extractor with API configuration."""
+        """
+        Initialize FMP extractor with API configuration and settings.
+        
+        This constructor sets up the FMP extractor with the necessary configuration
+        and validates the API key availability. It follows the Template Method pattern
+        by calling the parent class initialization with standardized parameters.
+        
+        Parameters
+        ----------
+        symbols : Union[str, List[str]], optional
+            Single symbol or list of symbols to track
+        start_date : datetime, optional
+            Start date for data retrieval period
+        end_date : datetime, optional
+            End date for data retrieval period
+        interval : Interval, optional
+            Data interval enumeration (e.g., DAILY)
+            
+        Raises
+        ------
+        ValueError
+            If the FMP API key is not found in environment variables
+        """
         super().__init__(
             symbols=symbols if symbols is not None else [],
             start_date=start_date,
@@ -49,32 +104,49 @@ class FMPExtractor(BaseExtractor):
         interval: str = "1day"
     ) -> pd.DataFrame:
         """
-        Fetch historical data from FMP API.
+        Fetch historical price data from the FMP API for given symbols and date range.
+        
+        This method implements the Template Method pattern by providing the concrete
+        implementation for data extraction from FMP API. It handles multiple symbols,
+        performs data validation, and manages error scenarios.
+        
+        Design Pattern Implementation:
+            - Template Method: Concrete implementation of abstract method
+            - Strategy: FMP-specific data fetching strategy
+            
+        Process Flow:
+            1. Validate input parameters
+            2. Convert symbols to list format if needed
+            3. Fetch data for each symbol from FMP API
+            4. Combine and format the retrieved data
+            5. Save raw data for audit purposes
+            6. Format data into standardized structure
         
         Parameters
         ----------
         symbols : Union[str, List[str]]
-            Single symbol or list of symbols to fetch
-        start_date : datetime
-            Start date for data range
-        end_date : datetime
-            End date for data range
-        interval : str, optional
-            Data interval, by default "1day"
-        include_adj : bool, optional
-            Whether to include adjusted prices, by default True
+            Single symbol or list of symbols to fetch (e.g., 'AAPL' or ['AAPL', 'MSFT'])
+        start_date : datetime, default: 30 days ago
+            Start date for historical data range
+        end_date : datetime, default: today
+            End date for historical data range
+        interval : str, optional, default: "1day"
+            Data interval, currently only supports daily data
             
         Returns
         -------
         pd.DataFrame
-            Historical price data
+            Historical price data in standardized format with MultiIndex columns
+            for price types (Open, High, Low, Close, Volume) and symbols
             
         Raises
         ------
         ValueError
-            If invalid parameters are provided
+            If symbols list is empty or dates are invalid
         ConnectionError
-            If data cannot be retrieved from FMP
+            If API request fails or data cannot be retrieved
+        RuntimeError
+            If retrieved data is empty or invalid
         """
         try:
             if isinstance(symbols, str):
@@ -118,17 +190,42 @@ class FMPExtractor(BaseExtractor):
         data: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Format FMP data into standardized format.
+        Format raw FMP data into a standardized structure for analysis.
+        
+        This method implements part of the Template Method pattern by providing
+        the concrete implementation for data formatting specific to FMP API data.
+        It handles data cleaning, column renaming, and restructuring into a
+        standardized format used across the application.
+        
+        Design Pattern Implementation:
+            - Template Method: Concrete implementation for FMP-specific formatting
+            - Strategy: Part of the FMP data handling strategy
+            
+        Transformation Steps:
+            1. Rename columns to standard format
+            2. Convert date strings to datetime objects
+            3. Set date as index
+            4. Remove unnecessary columns
+            5. Pivot data for multi-symbol support
+            6. Save processed data for audit purposes
         
         Parameters
         ----------
         data : pd.DataFrame
-            Raw data from FMP API
+            Raw data from FMP API with original column names and structure
         
         Returns
         -------
         pd.DataFrame
-            Formatted data with standardized structure
+            Clean, formatted data with standardized MultiIndex columns:
+            - Level 0: Price type (Open, High, Low, Close, Volume)
+            - Level 1: Symbol
+            Index: DateTime
+            
+        Raises
+        ------
+        ValueError
+            If data transformation fails or results in invalid format
         """
         try:
             data = data.rename(columns={
@@ -167,12 +264,39 @@ class FMPExtractor(BaseExtractor):
     
     def get_source_info(self) -> Dict:
         """
-        Get FMP specific source information.
+        Retrieve FMP API source information and capabilities.
         
+        This method implements the Template Method pattern by providing
+        FMP-specific information about the data source. It includes details
+        about supported features, API limitations, and documentation references.
+        
+        Design Pattern Implementation:
+            - Template Method: Concrete implementation for FMP metadata
+            - Strategy: Part of the FMP-specific implementation
+            
         Returns
         -------
         Dict
-            Information about FMP API capabilities
+            Comprehensive information about FMP API including:
+            - Source name
+            - Supported data intervals
+            - API authentication requirements
+            - Base URL and documentation links
+            - Rate limiting information
+            
+        Example Output
+        -------------
+        {
+            "name": "Financial Modeling Prep",
+            "supported_intervals": ["DAILY"],
+            "requires_api_key": True,
+            "base_url": "https://financialmodelingprep.com/",
+            "documentation": "https://site.financialmodelingprep.com/developer/docs",
+            "rate_limits": {
+                "requests_per_minute": 300,
+                "daily_limit": "Depends on subscription plan"
+            }
+        }
         """
         return {
             "name": "Financial Modeling Prep",

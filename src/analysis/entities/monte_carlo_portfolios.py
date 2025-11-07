@@ -1,128 +1,133 @@
 """
-Monte Carlo simulation: portfolio weight allocation using historical returns.
+Monte Carlo Simulation: Portfolio weight allocation using historical returns.
 """
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
+from typing import Optional
 from src.analysis.entities.monte_carlo_base import MonteCarloBase
-
 
 class MonteCarloPortfolio(MonteCarloBase):
     """
-    Simulação de Monte Carlo variando pesos de alocação em um portfólio,
-    utilizando retornos históricos reais dos ativos.
+    Monte Carlo simulation varying portfolio allocation weights,
+    using real historical returns of assets.
 
-    Essa simulação mantém a estrutura temporal e as correlações reais do mercado,
-    variando apenas as combinações de pesos para encontrar distribuições possíveis
-    de retorno e risco.
+    This simulation preserves the temporal structure and actual
+    market correlations, varying only the weight combinations to
+    explore possible distributions of return and risk.
     """
 
     def __init__(
         self,
         portfolio,
-        n_simulacoes: int = 1000,
-        taxa_livre_risco: float = 0.0,
-        capital_inicial: float = 10000.0,
-        metodo_pesos: str = "dirichlet",
-        seed: int = None
+        n_simulations: int = 1000,
+        risk_free_rate: float = 0.0,
+        initial_capital: float = 10000.0,
+        weight_method: str = "dirichlet",
+        seed: Optional[int] = None,
     ):
         """
-        Parâmetros
-        ----------
-        portfolio : Portfolio
-            Instância da classe Portfolio, contendo os retornos históricos dos ativos.
-        n_simulacoes : int
-            Número de simulações a serem executadas.
-        taxa_livre_risco : float
-            Taxa livre de risco anualizada.
-        capital_inicial : float
-            Valor inicial do capital investido.
-        seed : int, opcional
-            Semente aleatória para reprodutibilidade.
+        Initializes the Monte Carlo Portfolio simulation.
+
+        Args:
+            portfolio: Portfolio
+                Instance of the Portfolio class containing historical asset returns.
+            n_simulations: int, optional
+                Number of Monte Carlo simulations to be executed. Default is 1000.
+            risk_free_rate: float, optional
+                Annualized risk-free rate. Default is 0.0.
+            initial_capital: float, optional
+                Initial amount of invested capital. Default is 10,000.
+            weight_method: str, optional
+                Method for generating random weights ("dirichlet" or "normalized").
+                Default is "dirichlet".
+            seed: int, optional
+                Random seed for reproducibility. Default is None.
         """
         super().__init__(
             portfolio=portfolio,
-            n_simulacoes=n_simulacoes,
-            taxa_livre_risco=taxa_livre_risco,
-            seed=seed
+            n_simulations=n_simulations,
+            risk_free_rate=risk_free_rate,
+            seed=seed,
         )
 
-        self.capital_inicial = capital_inicial
-        self.retornos_historicos = self.portfolio.series.get_returns()
-        self.ativos = self.retornos_historicos.columns
-        self.n_ativos = len(self.ativos)
-        self.simulacoes: pd.DataFrame = pd.DataFrame(columns=["Retorno", "Valor", "Simulação"])
-        self.metodo_pesos = metodo_pesos
+        self.initial_capital = initial_capital
+        self.weight_method = weight_method
+        self.historical_returns = self.portfolio.series.get_returns()
+        self.assets = self.historical_returns.columns
+        self.n_assets = len(self.assets)
+        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])
 
-    # --------------------------------------------------------------
-    # Método principal da simulação
-    # --------------------------------------------------------------
     def run(self) -> pd.DataFrame:
         """
-        Executa a simulação de Monte Carlo variando apenas os pesos,
-        utilizando os retornos históricos dos ativos.
+        Runs the Monte Carlo simulation by varying only portfolio weights,
+        using real historical asset returns.
 
         Returns:
-            pd.DataFrame: DataFrame com simulações expandidas contendo:
-                - Ativo: nome do ativo
-                - Data: data da simulação
-                - Peso: peso do ativo na carteira
-                - Valor: valor do ativo
-                - Valor Total: soma total da carteira
-                - Retorno: retorno do ativo
-                - Simulação: número da simulação
+            pd.DataFrame: Expanded simulation results containing:
+                - Asset: asset name
+                - Date: timestamp of the simulated period
+                - Weight: asset weight in the portfolio
+                - Value: asset value evolution
+                - Total Value: total portfolio value
+                - Return: asset return
+                - Simulation: simulation number
         """
-        simulacoes_lista = []
+        simulation_results = []
 
-        for sim in range(self.n_simulacoes):
-            # 1. Gera pesos aleatórios
-            pesos = self._gerar_pesos()
+        for sim in range(self.n_simulations):
+            # 1. Generate random weights
+            weights = self._generate_weights()
 
-            # 2. Criar DataFrame de retornos históricos por ativo
-            df_retornos = self.retornos_historicos.copy()
+            # 2. Copy historical returns
+            returns_df = self.historical_returns.copy()
 
-            # 3. Calcular valores e retornos para cada ativo
-            for ativo in self.ativos:
-                peso_ativo = pesos[list(self.ativos).index(ativo)]
-                retornos_ativo = df_retornos[ativo]
-                valores_ativo = self.capital_inicial * peso_ativo * (1 + retornos_ativo).cumprod()
-                valor_total = self.capital_inicial * (1 + df_retornos).dot(pesos).cumprod()
+            # 3. Compute values and returns per asset
+            for asset in self.assets:
+                asset_weight = weights[list(self.assets).index(asset)]
+                asset_returns = returns_df[asset]
 
-                # Criar DataFrame para o ativo atual
-                df_ativo = pd.DataFrame({
-                    'Ativo': ativo,
-                    'Data': df_retornos.index,
-                    'Peso': peso_ativo,
-                    'Valor': valores_ativo,
-                    'Valor Total': valor_total,
-                    'Retorno': retornos_ativo,
-                    'Simulação': sim + 1
+                asset_values = self.initial_capital * asset_weight * (1 + asset_returns).cumprod()
+                total_value = self.initial_capital * (1 + returns_df).dot(weights).cumprod()
+
+                asset_df = pd.DataFrame({
+                    "Asset": asset,
+                    "Date": returns_df.index,
+                    "Weight": asset_weight,
+                    "Value": asset_values,
+                    "Total Value": total_value,
+                    "Return": asset_returns,
+                    "Simulation": sim + 1,
                 })
 
-                simulacoes_lista.append(df_ativo)
+                simulation_results.append(asset_df)
 
-        # Consolidar todas as simulações em um único DataFrame
-        self.simulacoes = pd.concat(simulacoes_lista, ignore_index=True)
-        
-        # Calcular métricas agregadas por simulação
-        self.metricas_simulacoes = (self.simulacoes
-            .groupby('Simulação')
+        # Consolidate all simulations into one DataFrame
+        self.simulations = pd.concat(simulation_results, ignore_index=True)
+
+        # Compute aggregate metrics by simulation
+        self.simulation_metrics = (
+            self.simulations
+            .groupby("Simulation")
             .agg({
-                'Valor Total': lambda x: x.iloc[-1],
-                'Retorno': ['mean', 'std']
+                "Total Value": lambda x: x.iloc[-1],
+                "Return": ["mean", "std"],
             })
-            .round(4))
-        
-        return self.simulacoes
+            .round(4)
+        )
 
-    # --------------------------------------------------------------
-    # Métodos auxiliares
-    # --------------------------------------------------------------
-    def _gerar_pesos(self) -> np.ndarray:
-        """Gera pesos aleatórios que somam 1."""
-        if self.metodo_pesos == "dirichlet":
-            pesos = np.random.dirichlet(np.ones(self.n_ativos))
+        return self.simulations
+
+    def _generate_weights(self) -> np.ndarray:
+        """
+        Generates random portfolio weights that sum to 1.
+
+        Returns:
+            np.ndarray: Vector of normalized portfolio weights.
+        """
+        if self.weight_method == "dirichlet":
+            weights = np.random.dirichlet(np.ones(self.n_assets))
         else:
-            w = np.abs(np.random.randn(self.n_ativos))
-            pesos = w / np.sum(w)
-        return pesos
+            random_values = np.abs(np.random.randn(self.n_assets))
+            weights = random_values / np.sum(random_values)
+        return weights

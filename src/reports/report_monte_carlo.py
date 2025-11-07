@@ -1,219 +1,220 @@
 """
-Gerador de relatórios em Markdown para simulações Monte Carlo.
+Markdown report generator for Monte Carlo simulations.
 """
 
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Union, List
 from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
-from src.analysis.entities.monte_carlo_returns import MonteCarloRetorno
+from src.analysis.entities.monte_carlo_returns import MonteCarloReturn
 from src.analysis.entities.monte_carlo_portfolios import MonteCarloPortfolio
-from src.analysis.entities.monte_carlo_combined import MonteCarloCombinado
-from src.core.entities.portfolio import Portfolio
-from src.analysis.entities.monte_carlo_metrics import CalculadorMonteCarlo
-from src.plots.plot_monte_carlo import VisualizadorMonteCarlo
+from src.analysis.entities.monte_carlo_combined import MonteCarloCombined
+from src.analysis.entities.monte_carlo_metrics import MonteCarloCalculator
+from src.plots.plot_monte_carlo import MonteCarloVisualizer
 from src.reports.report_base import BaseReport
 
 class MonteCarloReport(BaseReport):
+    """Specialized report for Monte Carlo simulations.
+    Generates a complete report with visualizations and performance metrics.
     """
-    Relatório especializado para simulações Monte Carlo.
-    Gera um relatório completo com visualizações e métricas.
-    """
-    
+
     def __init__(
         self,
-        simulacao: Union[MonteCarloRetorno, MonteCarloPortfolio, MonteCarloCombinado],
-        titulo: str = "Relatório de Simulação Monte Carlo",
+        simulation: Union[MonteCarloReturn, MonteCarloPortfolio, MonteCarloCombined],
+        title: str = "Monte Carlo Simulation Report",
         include_plots: bool = True,
-        include_tables: bool = True
-    ):
-        """
-        Parameters
-        ----------
-        simulacao : MonteCarloRetorno | MonteCarloPortfolio | MonteCarloCombinado
-            Simulação Monte Carlo já executada
-        titulo : str
-            Título do relatório
-        output_dir : Path, opcional
-            Diretório para salvar o relatório
-        include_plots : bool
-            Se True, inclui visualizações
-        include_tables : bool
-            Se True, inclui tabelas de métricas
-        """
-        super().__init__(
-            titulo=titulo,
-            include_plots=include_plots,
-            include_tables=include_tables
-        )
-        
-        if simulacao.simulacoes is None:
-            raise ValueError("A simulação precisa ser executada antes de gerar o relatório")
+        include_tables: bool = True,
+    ) -> None:
+        """Initialize MonteCarloReport.
 
-        self.simulacao = simulacao
-        self.calculador = CalculadorMonteCarlo(simulacao.simulacoes)
-        self.visualizador = VisualizadorMonteCarlo(simulacao.simulacoes)
-        
+        Args:
+            simulation (Union[MonteCarloRetorno, MonteCarloPortfolio, MonteCarloCombinado]):
+                Monte Carlo simulation object already executed.
+            title (str, optional): Report title. Defaults to "Monte Carlo Simulation Report".
+            include_plots (bool, optional): Whether to include visualizations. Defaults to True.
+            include_tables (bool, optional): Whether to include metrics tables. Defaults to True.
+
+        Raises:
+            ValueError: If the simulation has not been executed yet.
+        """
+        super().__init__(title=title, include_plots=include_plots, include_tables=include_tables)
+
+        if simulation.simulations is None:
+            raise ValueError("Simulation must be executed before generating the report.")
+
+        self.simulation = simulation
+        self.calculator = MonteCarloCalculator(simulation.simulations)
+        self.visualizer = MonteCarloVisualizer(simulation.simulations)
+
     def generate(self, auto_save: bool = True) -> Union[str, Path]:
+        """Generate Monte Carlo simulation report and optionally save it.
+
+        Args:
+            auto_save (bool, optional): If True, automatically saves the report after generating.
+                Defaults to True.
+
+        Returns:
+            Union[str, Path]: Path of the saved file if auto_save=True, otherwise Markdown string content.
         """
-        Gera o conteúdo do relatório Monte Carlo e opcionalmente salva em arquivo.
-        
-        Parameters
-        ----------
-        auto_save : bool, opcional
-            Se True, salva automaticamente o relatório após gerar (default: True)
-            
-        Returns
-        -------
-        Union[str, Path]
-            Se auto_save=True: Path do arquivo salvo
-            Se auto_save=False: Conteúdo do relatório em formato Markdown
-        """
-        # Limpa seções anteriores
+        # Clear previous sections
         self.sections = []
-        
-        # Informações gerais sobre a simulação e o portfolio
+
+        # General info about the simulation and portfoli
         self._add_simulation_info()
 
-        # Performance e risco (tabelas)
+        # Performance and risk tables
         if self.include_tables:
             self._add_performance_metrics()
             self._add_risk_metrics()
 
-        # Visualizações
+        # Visualizations
         if self.include_plots:
             self._add_visualizations()
 
-        # Conclusões
+        # Conclusions
         self._add_conclusions()
 
         if auto_save:
-            # Usa os símbolos do portfolio para o nome do arquivo
-            portfolio = self.simulacao.portfolio
+            # Use portfolio symbols for file naming
+            portfolio = self.simulation.portfolio
             symbols = list(portfolio.holdings)
-            
-            sim_type = self.simulacao.__class__.__name__.replace('MonteCarlo', '').lower()
-            
-            # Cria o nome do arquivo com o tipo de simulação e os símbolos
+
+            sim_type = self.simulation.__class__.__name__.replace("MonteCarlo", "").lower()
             filename = f"montecarlo_{sim_type}_{datetime.now().strftime('%H%M%S')}"
-            
-            # Salva o relatório com o nome customizado
-            return self.save(
-                symbols=symbols,
-                custom_name=filename
-            )
-            
-        # Se não for para salvar, junta todas as seções em uma string
-        full_report = []
+
+            return self.save(symbols=symbols, custom_name=filename)
+
+        # If not saving, return Markdown string
+        full_report: List[str] = []
         for section in self.sections:
-            if section['level'] > 0:
+            if section["level"] > 0:
                 full_report.append(f"{'#' * section['level']} {section['title']}")
-            if section['content']:
-                full_report.append(section['content'])
+            if section["content"]:
+                full_report.append(section["content"])
             full_report.append("")
-            
+
         return "\n".join(full_report)
 
     def _add_simulation_info(self) -> None:
-        """Adiciona informações básicas sobre a simulação e o portfolio."""
-        self.add_section("Informações do Portfolio", level=2)
+        """Add basic information about the simulation and portfolio."""
+        self.add_section("Portfolio Information", level=2)
 
-        portfolio = self.simulacao.portfolio
+        portfolio = self.simulation.portfolio
         portfolio_info = [
-            f"- **Nome:** {portfolio.name}",
-            "- **Ativos:**"
+            f"- **Name:** {portfolio.name}",
+            "- **Assets:**",
         ]
-        for ativo, peso in portfolio.weights().items():
-            portfolio_info.append(f"  - {ativo}: {peso:.2%}")
-        portfolio_info.extend([
-            f"- **Período:** {portfolio.start_date} a {portfolio.end_date}",
-            f"- **Número de Simulações:** {self.simulacao.n_simulacoes}"
-        ])
+        for asset, weight in portfolio.weights().items():
+            portfolio_info.append(f"  - {asset}: {weight:.2%}")
+        portfolio_info.extend(
+            [
+                f"- **Period:** {portfolio.start_date} to {portfolio.end_date}",
+                f"- **Number of Simulations:** {self.simulation.n_simulations}",
+            ]
+        )
         self.add_section("", "\n".join(portfolio_info))
 
     def _add_performance_metrics(self) -> None:
-        """Monta tabelas com estatísticas de performance da simulação."""
-        self.add_section("Métricas de Performance", level=2)
+        """Create performance statistics tables for the simulation."""
+        self.add_section("Performance Metrics", level=2)
 
-        stats = self.calculador.calcular_estatisticas_basicas()
-        stats_df = pd.DataFrame({
-            'Métrica': ['Retorno Médio', 'Retorno Mediano', 'Desvio Padrão', 'Retorno Mínimo', 'Retorno Máximo'],
-            'Valor': [
-                stats['retorno_medio'],
-                stats['retorno_mediano'],
-                stats['desvio_padrao'],
-                stats['retorno_minimo'],
-                stats['retorno_maximo']
-            ]
-        })
-        self.add_table(stats_df, "Estatísticas Básicas", format_dict={'Valor': lambda x: f"{x:.2%}"})
+        stats = self.calculator.calculate_basic_statistics()
+        stats_df = pd.DataFrame(
+            {
+                "Metric": [
+                    "Mean Return",
+                    "Median Return",
+                    "Standard Deviation",
+                    "Minimum Return",
+                    "Maximum Return",
+                ],
+                "Value": [
+                    stats["mean_return"],
+                    stats["median_return"],
+                    stats["std_deviation"],
+                    stats["min_return"],
+                    stats["max_return"],
+                ],
+            }
+        )
+        self.add_table(stats_df, "Basic Statistics", format_dict={"Value": lambda x: f"{x:.2%}"})
 
     def _add_risk_metrics(self) -> None:
-        """Monta tabelas com métricas de risco (VaR/CVaR/drawdown)."""
-        # VaR / CVaR
-        var_cvar = self.calculador.calcular_var_cvar()
-        risk_df = pd.DataFrame({'Métrica': ['VaR 95%', 'CVaR 95%'], 'Valor': [var_cvar['var'], var_cvar['cvar']]})
-        self.add_table(risk_df, "Métricas de Risco", format_dict={'Valor': lambda x: f"{x:.2%}"})
+        """Create risk metric tables (VaR, CVaR, drawdowns)."""
+        var_cvar = self.calculator.calculate_var_cvar()
+        risk_df = pd.DataFrame(
+            {"Metric": ["VaR 95%", "CVaR 95%"], "Value": [var_cvar["var"], var_cvar["cvar"]]}
+        )
+        self.add_table(risk_df, "Risk Metrics", format_dict={"Value": lambda x: f"{x:.2%}"})
 
-        # Drawdowns
-        drawdowns = self.calculador.calcular_drawdowns()
-        dd_df = pd.DataFrame({
-            'Métrica': ['Máximo Drawdown', 'Drawdown Médio', 'Desvio Drawdown'],
-            'Valor': [drawdowns['max_drawdown'], drawdowns['avg_drawdown'], drawdowns['drawdown_std']]
-        })
-        self.add_table(dd_df, "Métricas de Drawdown", format_dict={'Valor': lambda x: f"{x:.2%}"})
+        drawdowns = self.calculator.calculate_drawdowns()
+        dd_df = pd.DataFrame(
+            {
+                "Metric": ["Max Drawdown", "Average Drawdown", "Drawdown Std"],
+                "Value": [
+                    drawdowns["max_drawdown"],
+                    drawdowns["avg_drawdown"],
+                    drawdowns["drawdown_std"],
+                ],
+            }
+        )
+        self.add_table(dd_df, "Drawdown Metrics", format_dict={"Value": lambda x: f"{x:.2%}"})
 
     def _add_visualizations(self) -> None:
-        """Adiciona plots principais da simulação."""
-        self.add_section("Visualizações", level=2)
+        """Add main simulation plots."""
+        self.add_section("Visualizations", level=2)
 
-        # Evolução do valor
+        # Portfolio value evolution
         plt.figure(figsize=(12, 6))
-        self.visualizador.plot_evolucao_valor()
-        self.add_plot(plt.gcf(), "Evolução do Valor da Carteira")
+        self.visualizer.plot_portfolio_value_evolution()
+        self.add_plot(plt.gcf(), "Portfolio Value Evolution")
         plt.close()
 
-        # Distribuição dos retornos
+        # Returns distribution
         plt.figure(figsize=(10, 6))
-        self.visualizador.plot_distribuicao_retornos()
-        self.add_plot(plt.gcf(), "Distribuição dos Retornos")
+        self.visualizer.plot_return_distribution()
+        self.add_plot(plt.gcf(), "Returns Distribution")
         plt.close()
 
-        # Evolução dos pesos (quando aplicável)
+        # Portfolio weights evolution (if applicable)
         try:
             plt.figure(figsize=(12, 6))
-            self.visualizador.plot_evolucao_pesos()
-            self.add_plot(plt.gcf(), "Evolução dos Pesos")
+            self.visualizer.plot_asset_weight_evolution()
+            self.add_plot(plt.gcf(), "Weights Evolution")
             plt.close()
         except Exception:
-            # Alguns tipos de simulação podem não ter pesos
+            # Some simulation types may not include dynamic weights
             pass
 
-        # Dashboard de métricas
+        # Metrics dashboard
         plt.figure(figsize=(15, 12))
-        self.visualizador.plot_metricas()
-        self.add_plot(plt.gcf(), "Dashboard de Métricas")
+        self.visualizer.plot_metrics_dashboard()
+        self.add_plot(plt.gcf(), "Metrics Dashboard")
         plt.close()
 
     def _add_conclusions(self) -> None:
-        """Mantém a seção de conclusões original, resumindo resultados e diferenças por tipo de simulação."""
-        self.add_section("Conclusões", level=2)
+        """Add a summary section with key results and interpretation."""
+        self.add_section("Conclusions", level=2)
 
-        stats = self.calculador.calcular_estatisticas_basicas()
-        var_cvar = self.calculador.calcular_var_cvar()
+        stats = self.calculator.calculate_basic_statistics()
+        var_cvar = self.calculator.calculate_var_cvar()
 
         conclusions = [
-            "\nCom base nas simulações realizadas, podemos concluir:",
-            f"\n1. O retorno médio esperado é de {stats['retorno_medio']:.2%}, com um desvio padrão de {stats['desvio_padrao']:.2%}",
-            f"2. Existe um risco de {var_cvar['var']:.2%} de perda (VaR 95%)",
-            f"3. Em cenários extremos, a perda média esperada é de {var_cvar['cvar']:.2%} (CVaR 95%)"
+            "\nBased on the Monte Carlo simulations, we can conclude:",
+            f"\n1. The expected mean return is {stats['mean_return']:.2%}, "
+            f"with a standard deviation of {stats['std_deviation']:.2%}.",
+            f"2. There is a {var_cvar['var']:.2%} risk of loss (VaR 95%).",
+            f"3. In extreme scenarios, the expected average loss is {var_cvar['cvar']:.2%} (CVaR 95%).",
         ]
 
-        if isinstance(self.simulacao, MonteCarloPortfolio):
-            conclusions.append("4. A simulação de pesos mostra diversas composições possíveis para a carteira")
-        elif isinstance(self.simulacao, MonteCarloRetorno):
-            conclusions.append("4. A simulação de retornos mantém os pesos fixos e explora diferentes cenários de mercado")
+        if isinstance(self.simulation, MonteCarloPortfolio):
+            conclusions.append(
+                "4. The portfolio simulation shows multiple possible compositions for the portfolio."
+            )
+        elif isinstance(self.simulation, MonteCarloReturn):
+            conclusions.append(
+                "4. The return simulation keeps portfolio weights fixed and explores different market scenarios."
+            )
 
         self.add_section("", "\n".join(conclusions))
-

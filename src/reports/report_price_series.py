@@ -1,6 +1,6 @@
 """
-Relatório especializado para análise de séries temporais de preços.
-Gera relatórios completos com visualizações e análises de ativos.
+Specialized report for price time series analysis.
+Generates complete reports with visualizations and analytics for financial assets.
 """
 
 from pathlib import Path
@@ -11,375 +11,303 @@ import pandas as pd
 import numpy as np
 
 from src.reports.report_base import BaseReport
-from src.plots.plot_price_series import VisualizadorPriceSeries
+from src.plots.plot_price_series import PriceSeriesVisualizer
 from src.core.entities.price_series import PriceSeries
 
+
 class PriceSeriesReport(BaseReport):
+    """Specialized report for price time series analysis.
+
+    Produces detailed reports (individual and consolidated) containing
+    technical charts, statistical tables, return analysis and risk metrics.
     """
-    Relatório especializado para análise de séries temporais de preços.
-    Gera um relatório completo com visualizações e métricas para análise
-    técnica e estatística de ativos financeiros.
-    """
-    
+
     def __init__(
         self,
         price_series: PriceSeries,
-        titulo: str = "Relatório de Análise de Série Temporal",
+        title: str = "Price Time Series Analysis Report",
         include_plots: bool = True,
         include_tables: bool = True,
-        moving_averages: Optional[List[int]] = [20, 50, 200]
-    ):
+        moving_averages: Optional[List[int]] = None,
+    ) -> None:
+        """Initialize PriceSeriesReport.
+
+        Args:
+            price_series (PriceSeries): Domain object with time series data.
+            title (str, optional): Report title. Defaults to
+                "Price Time Series Analysis Report".
+            include_plots (bool, optional): Whether to include plots.
+                Defaults to True.
+            include_tables (bool, optional): Whether to include tables.
+                Defaults to True.
+            moving_averages (Optional[List[int]], optional): List of MA
+                windows to include. Defaults to [20, 50, 200].
         """
-        Parameters
-        ----------
-        price_series : PriceSeries
-            Objeto PriceSeries com os dados do ativo
-        titulo : str
-            Título do relatório
-        include_plots : bool
-            Se True, inclui visualizações
-        include_tables : bool
-            Se True, inclui tabelas de métricas
-        moving_averages : List[int], opcional
-            Lista com períodos para médias móveis
-        """
-        super().__init__(
-            titulo=titulo,
-            include_plots=include_plots,
-            include_tables=include_tables
-        )
-        
+        super().__init__(title=title, include_plots=include_plots, include_tables=include_tables)
+
         self.price_series = price_series
         self.data = price_series.data
-        self.moving_averages = moving_averages or []
+        self.moving_averages = moving_averages if moving_averages is not None else [20, 50, 200]
 
-        # Verifica se o DataFrame tem a estrutura esperada de MultiIndex
+        # Expect a MultiIndex on columns with levels ['Price', 'Ticker']
         if not isinstance(self.data.columns, pd.MultiIndex):
-            raise ValueError("O DataFrame deve ter um MultiIndex (Price, Ticker)")
-            
-        if self.data.columns.names != ['Price', 'Ticker']:
-            raise ValueError("O MultiIndex deve ter os níveis ['Price', 'Ticker']")
-            
-        self.required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-        if not all(col in self.data.columns.get_level_values('Price') for col in self.required_columns):
-            raise ValueError(
-                f"PriceSeries deve conter as colunas: {', '.join(self.required_columns)}"
-            )
-        
-        self.symbols = price_series.symbols if isinstance(price_series.symbols, list) else [price_series.symbols]
-        self.symbol_data = {}
-        self.visualizadores = {}
-        
+            raise ValueError("DataFrame must have a MultiIndex on columns (Price, Ticker).")
+
+        if self.data.columns.names != ["Price", "Ticker"]:
+            raise ValueError("MultiIndex must have levels ['Price', 'Ticker'].")
+
+        self.required_columns = ["Open", "High", "Low", "Close", "Volume"]
+        price_level_values = self.data.columns.get_level_values("Price")
+        if not all(col in price_level_values for col in self.required_columns):
+            raise ValueError(f"PriceSeries must contain columns: {', '.join(self.required_columns)}")
+
+        self.symbols: List[str] = (
+            price_series.symbols if isinstance(price_series.symbols, list) else [price_series.symbols]
+        )
+        self.symbol_data: Dict[str, pd.DataFrame] = {}
+        self.visualizers: Dict[str, PriceSeriesVisualizer] = {}
+
     def generate(self) -> List[Path]:
+        """Generate individual reports for each symbol and a consolidated report.
+
+        Returns:
+            List[Path]: Paths to all generated reports (individual + consolidated).
         """
-        Gera relatórios individuais para cada symbol e um relatório consolidado.
-        
-        Returns
-        -------
-        List[Path]
-            Lista com os caminhos de todos os relatórios gerados
-        """
-        saved_reports = []
-        all_sections = []  # Para o relatório consolidado
-        
-        for symbol in self.symbols:
-            print(f"\nGerando relatório para {symbol}...")
-            
-            # Limpa as seções anteriores para o relatório individual
+        saved_reports: List[Path] = []
+        consolidated_sections: List[Dict[str, Any]] = []
+
+        for idx, symbol in enumerate(self.symbols):
+            print(f"\nGenerating report for {symbol}...")
+
+            # Reset sections for the individual report
             self.sections = []
-            
-            # Prepara dados do symbol atual
+
+            # Prepare symbol data and visualizer
             self._prepare_symbol_data(symbol)
-            
-            # Adiciona cabeçalho do symbol
-            self.add_section(f"Relatório: {symbol}", level=1)
-            
-            # Informações Básicas
+
+            # Header for the symbol
+            self.add_section(f"Report: {symbol}", level=1)
+
+            # Basic information
             self._add_info_section(symbol)
-            
-            # Análise Técnica
+
+            # Technical analysis (charts)
             if self.include_plots:
                 self._add_technical_analysis(symbol)
-            
-            # Análise Estatística
+
+            # Statistical analysis (tables)
             if self.include_tables:
                 self._add_statistical_analysis(symbol)
-            
-            # Análise de Retornos
+
+            # Returns analysis
             self._add_returns_analysis(symbol)
-            
-            # Análise de Risco
+
+            # Risk analysis
             self._add_risk_analysis(symbol)
-            
-            # Salva relatório individual
+
+            # Save individual report
             individual_path = self.save(symbols=[symbol])
             saved_reports.append(individual_path)
-            
-            # Guarda as seções para o relatório consolidado
-            all_sections.extend(self.sections)
-            if symbol != self.symbols[-1]:
-                all_sections.append({'title': '', 'content': '---\n', 'level': 0})
-        
-        # Gera relatório consolidado
-        self.sections = all_sections
+
+            # Collect sections for consolidated report
+            consolidated_sections.extend(self.sections)
+            if idx != len(self.symbols) - 1:
+                # add separator between symbols when consolidating
+                consolidated_sections.append({"title": "", "content": "---\n", "level": 0})
+
+        # Generate consolidated report
+        self.sections = consolidated_sections
         consolidated_path = self.save(symbols=self.symbols)
         saved_reports.append(consolidated_path)
-        
-        print(f"\nRelatórios gerados com sucesso:")
-        print(f"- Relatórios individuais: {len(self.symbols)}")
-        print(f"- Relatório consolidado: 1")
-        print(f"Total de relatórios: {len(saved_reports)}")
-        
+
+        print("\nReports successfully generated:")
+        print(f"- Individual reports: {len(self.symbols)}")
+        print("- Consolidated report: 1")
+        print(f"Total reports: {len(saved_reports)}")
+
         return saved_reports
-        
+
     def _prepare_symbol_data(self, symbol: str) -> None:
+        """Prepare and cache the DataFrame for a specific symbol.
+
+        Args:
+            symbol (str): Asset ticker/symbol.
         """
-        Prepara os dados para um symbol específico.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        # Se já temos os dados deste symbol, não precisamos processar novamente
         if symbol in self.symbol_data:
             return
-            
-        # Obtém os dados do symbol
+
+        # Build DataFrame for the symbol from the multi-index source
         symbol_df = pd.DataFrame()
         for col in self.required_columns:
-            symbol_df[col] = self.data[col, symbol]
+            symbol_df[col] = self.data[(col, symbol)]
 
-        # Armazena os dados e cria visualizador
         self.symbol_data[symbol] = symbol_df
-        self.visualizadores[symbol] = VisualizadorPriceSeries(symbol_df)
-        
+        self.visualizers[symbol] = PriceSeriesVisualizer(symbol_df)
+
     def _add_info_section(self, symbol: str) -> None:
+        """Add a section with basic information about the asset.
+
+        Args:
+            symbol (str): Asset symbol.
         """
-        Adiciona seção com informações básicas do ativo.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        self.add_section(
-            "Informações do Ativo",
-            level=2
-        )
-        
-        # Obtém informações do symbol atual
+        self.add_section("Asset Information", level=2)
+
         df = self.symbol_data[symbol]
-        primeiro_preco = df['Close'].iloc[0]
-        ultimo_preco = df['Close'].iloc[-1]
-        
-        info = [
-            f"- **Ativo:** {symbol}",
-            f"- **Período:** {self.price_series.start_date} a {self.price_series.end_date}",
-            f"- **Número de Observações:** {len(self.symbol_data)}",
-            f"- **Primeiro Preço:** {primeiro_preco:.2f}",
-            f"- **Último Preço:** {ultimo_preco:.2f}",
-            f"- **Variação Total:** {((ultimo_preco / primeiro_preco) - 1):.2%}"
+        first_price = df["Close"].iloc[0]
+        last_price = df["Close"].iloc[-1]
+
+        info_lines = [
+            f"- **Symbol:** {symbol}",
+            f"- **Period:** {self.price_series.start_date} to {self.price_series.end_date}",
+            f"- **Number of Observations:** {len(df)}",
+            f"- **First Price:** {first_price:.2f}",
+            f"- **Last Price:** {last_price:.2f}",
+            f"- **Total Change:** {(last_price / first_price - 1):.2%}",
         ]
-        
-        self.add_section("", "\n".join(info))
-        
+
+        self.add_section("", "\n".join(info_lines))
+
     def _add_technical_analysis(self, symbol: str) -> None:
+        """Add technical analysis plots for the symbol.
+
+        Includes price series with moving averages, candlestick chart and volume.
         """
-        Adiciona seção com análise técnica.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        self.add_section("Análise Técnica", level=2)
-        
-        visualizador = self.visualizadores[symbol]
-        
-        # Preços e Médias Móveis
-        fig = visualizador.plot_precos(window_ma=self.moving_averages)
-        self.add_plot(
-            fig,
-            "Evolução do Preço e Médias Móveis",
-            level=3
-        )
+        self.add_section("Technical Analysis", level=2)
+
+        visualizer = self.visualizers[symbol]
+
+        # Prices and moving averages
+        fig = visualizer.plot_prices(window_ma=self.moving_averages)
+        self.add_plot(fig, "Price Evolution and Moving Averages", level=3)
         plt.close()
-        
-        # Candlestick
-        fig = visualizador.plot_candlestick()
-        self.add_plot(
-            fig,
-            "Gráfico de Candlestick",
-            level=3
-        )
+
+        # Candlestick chart
+        fig = visualizer.plot_candlestick()
+        self.add_plot(fig, "Candlestick Chart", level=3)
         plt.close()
-        
-        # Volume
-        fig = visualizador.plot_volume()
-        self.add_plot(
-            fig,
-            "Volume de Negociação",
-            level=3
-        )
+
+        # Volume plot
+        fig = visualizer.plot_volume()
+        self.add_plot(fig, "Trading Volume", level=3)
         plt.close()
-        
+
     def _add_statistical_analysis(self, symbol: str) -> None:
+        """Add descriptive statistics tables for the symbol.
+
+        Args:
+            symbol (str): Asset symbol.
         """
-        Adiciona seção com análise estatística.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        self.add_section("Análise Estatística", level=2)
+        self.add_section("Statistical Analysis", level=2)
         df = self.symbol_data[symbol]
-        
-        # Estatísticas básicas dos preços
-        stats = pd.DataFrame({
-            'Métrica': [
-                'Média',
-                'Mediana',
-                'Desvio Padrão',
-                'Mínimo',
-                'Máximo',
-                'Assimetria',
-                'Curtose'
-            ],
-            'Close': [
-                df['Close'].mean(),
-                df['Close'].median(),
-                df['Close'].std(),
-                df['Close'].min(),
-                df['Close'].max(),
-                df['Close'].skew(),
-                df['Close'].kurtosis()
-            ],
-            'Volume': [
-                df['Volume'].mean(),
-                df['Volume'].median(),
-                df['Volume'].std(),
-                df['Volume'].min(),
-                df['Volume'].max(),
-                df['Volume'].skew(),
-                df['Volume'].kurtosis()
-            ]
-        })
-        
-        # Formata valores
-        format_dict = {
-            'Preço': lambda x: f"{x:.2f}",
-            'Volume': lambda x: f"{x:,.0f}"
-        }
-        
-        self.add_table(
-            stats,
-            "Estatísticas Descritivas",
-            format_dict=format_dict
-        )
-        
-    def _add_returns_analysis(self, symbol: str) -> None:
-        """
-        Adiciona seção com análise de retornos.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        self.add_section("Análise de Retornos", level=2)
-        
-        # Distribuição dos retornos
-        if self.include_plots:
-            fig = self.visualizadores[symbol].plot_retornos(tipo='log')
-            self.add_plot(
-                fig,
-                "Distribuição dos Retornos",
-                level=3
-            )
-            plt.close()
-            
-        # Estatísticas dos retornos
-        if self.include_tables:
-            # Calcula retornos logarítmicos
-            df = self.symbol_data[symbol]
-            returns = np.log(df['Close'] / df['Close'].shift(1))
-            
-            stats = pd.DataFrame({
-                'Métrica': [
-                    'Retorno Médio Diário',
-                    'Retorno Médio Anualizado',
-                    'Volatilidade Diária',
-                    'Volatilidade Anualizada',
-                    'Índice Sharpe',
-                    'Assimetria',
-                    'Curtose'
+
+        stats = pd.DataFrame(
+            {
+                "Metric": [
+                    "Mean",
+                    "Median",
+                    "StdDev",
+                    "Min",
+                    "Max",
+                    "Skewness",
+                    "Kurtosis",
                 ],
-                'Valor': [
-                    returns.mean(),
-                    returns.mean() * 252,
-                    returns.std(),
-                    returns.std() * np.sqrt(252),
-                    (returns.mean() * 252) / (returns.std() * np.sqrt(252)),
-                    returns.skew(),
-                    returns.kurtosis()
-                ]
-            })
-            
-            format_dict = {
-                'Valor': lambda x: (
-                    f"{x:.2%}" if "Retorno" in stats.loc[stats['Valor'] == x, 'Métrica'].iloc[0]
-                    else f"{x:.4f}"
-                )
+                "Close": [
+                    df["Close"].mean(),
+                    df["Close"].median(),
+                    df["Close"].std(),
+                    df["Close"].min(),
+                    df["Close"].max(),
+                    df["Close"].skew(),
+                    df["Close"].kurtosis(),
+                ],
+                "Volume": [
+                    df["Volume"].mean(),
+                    df["Volume"].median(),
+                    df["Volume"].std(),
+                    df["Volume"].min(),
+                    df["Volume"].max(),
+                    df["Volume"].skew(),
+                    df["Volume"].kurtosis(),
+                ],
             }
-            
-            self.add_table(
-                stats,
-                "Estatísticas dos Retornos",
-                format_dict=format_dict
+        )
+
+        format_dict = {"Close": lambda x: f"{x:.2f}", "Volume": lambda x: f"{x:,.0f}"}
+
+        self.add_table(stats, "Descriptive Statistics", format_dict=format_dict)
+
+    def _add_returns_analysis(self, symbol: str) -> None:
+        """Add returns analysis: plots and summary statistics.
+
+        Args:
+            symbol (str): Asset symbol.
+        """
+        self.add_section("Returns Analysis", level=2)
+
+        visualizer = self.visualizers[symbol]
+
+        # Return distribution plot (log returns)
+        if self.include_plots:
+            fig = visualizer.plot_returns(return_type="log")
+            self.add_plot(fig, "Returns Distribution", level=3)
+            plt.close()
+
+        # Return statistics table
+        if self.include_tables:
+            df = self.symbol_data[symbol]
+            returns = np.log(df["Close"] / df["Close"].shift(1)).dropna()
+
+            stats = pd.DataFrame(
+                {
+                    "Metric": [
+                        "Average Daily Return",
+                        "Annualized Return",
+                        "Daily Volatility",
+                        "Annualized Volatility",
+                        "Sharpe Ratio",
+                        "Skewness",
+                        "Kurtosis",
+                    ],
+                    "Value": [
+                        returns.mean(),
+                        returns.mean() * 252,
+                        returns.std(),
+                        returns.std() * np.sqrt(252),
+                        (returns.mean() * 252) / (returns.std() * np.sqrt(252)),
+                        returns.skew(),
+                        returns.kurtosis(),
+                    ],
+                }
             )
-            
+
+            format_dict = {
+                "Value": lambda x: f"{x:.2%}" if isinstance(x, (float, np.floating)) and abs(x) < 10 else f"{x:.4f}"
+            }
+
+            self.add_table(stats, "Return Statistics", format_dict=format_dict)
+
     def _add_risk_analysis(self, symbol: str) -> None:
+        """Add risk-related charts and the dashboard for the symbol.
+
+        Args:
+            symbol (str): Asset symbol.
         """
-        Adiciona seção com análise de risco.
-        
-        Parameters
-        ----------
-        symbol : str
-            Símbolo do ativo
-        """
-        self.add_section("Análise de Risco", level=2)
-        
-        visualizador = self.visualizadores[symbol]
-        
+        self.add_section("Risk Analysis", level=2)
+
+        visualizer = self.visualizers[symbol]
+
         if self.include_plots:
-            # Volatilidade
-            fig = visualizador.plot_volatilidade()
-            self.add_plot(
-                fig,
-                "Volatilidade Móvel",
-                level=3
-            )
+            # Volatility
+            fig = visualizer.plot_volatility()
+            self.add_plot(fig, "Rolling Volatility", level=3)
             plt.close()
-            
+
             # Drawdown
-            fig = visualizador.plot_drawdown()
-            self.add_plot(
-                fig,
-                "Análise de Drawdown",
-                level=3
-            )
+            fig = visualizer.plot_drawdown()
+            self.add_plot(fig, "Drawdown Analysis", level=3)
             plt.close()
-            
-        if self.include_plots:
-            # Dashboard completo
-            fig = visualizador.plot_dashboard(
-                window_ma=self.moving_averages
-            )
-            self.add_plot(
-                fig,
-                "Dashboard Completo",
-                level=2
-            )
+
+            # Full dashboard (includes MA windows)
+            fig = visualizer.plot_dashboard(window_ma=self.moving_averages)
+            self.add_plot(fig, "Complete Dashboard", level=2)
             plt.close()

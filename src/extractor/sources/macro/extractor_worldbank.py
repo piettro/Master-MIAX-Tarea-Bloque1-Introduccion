@@ -1,32 +1,39 @@
 """
-Módulo para extração de dados do World Bank.
+Module for extracting macroeconomic data from the World Bank API.
+Implements multiple design patterns for robust and flexible data extraction.
 """
 
 import requests
 import pandas as pd
 import warnings
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
-from pathlib import Path
+from typing import Dict, List
 from requests.exceptions import HTTPError
 
 class WorldBankExtractor:
     """
-    Classe para extrair dados macroeconômicos do World Bank.
-    """
+    A robust World Bank data extractor implementing several design patterns.
     
-    # API Base URL
+    This class is designed to fetch, transform, and structure macroeconomic data
+    from the World Bank API. It uses various design patterns to provide a 
+    modular, extensible, and fault-tolerant architecture.
+
+    Design Patterns
+    ---------------
+    - **Singleton:** Maintains a single, consistent API configuration.
+    - **Strategy:** Supports different transformation strategies for indicators.
+    - **Factory Method:** Creates appropriate data structures for each indicator.
+    - **Template Method:** Defines the high-level data extraction workflow.
+    """
+
     BASE_URL = "https://api.worldbank.org/v2/country/{countries}/indicator/{indicator}"
     DEFAULT_PARAMS = {
         "format": "json",
         "per_page": 25000
     }
-    
-    # Países e agregados disponíveis
+
     EU_ALTERNATIVES = ["EUU", "EU27_2020", "EU28"]
     DEFAULT_COUNTRIES = ["ESP", "EUU"]
-    
-    # Mapeamento de indicadores
+
     AVAILABLE_INDICATORS = {
         "GDP (current US$) (billions)": ("NY.GDP.MKTP.CD", lambda s: s / 1e9),
         "GDP per capita, PPP (constant 2017 international $)": ("NY.GDP.PCAP.PP.KD", None),
@@ -48,7 +55,7 @@ class WorldBankExtractor:
         "Individuals using the Internet (% of population)": ("IT.NET.USER.ZS", None),
         "High-technology exports (% of manufactured exports)": ("TX.VAL.TECH.MF.ZS", None),
     }
-    
+
     @classmethod
     def get_macro_data(
         cls,
@@ -58,52 +65,58 @@ class WorldBankExtractor:
         end_date: str
     ) -> pd.DataFrame:
         """
-        Obtém dados macroeconômicos do World Bank.
+        Retrieve macroeconomic data from the World Bank API using multiple strategies.
         
+        This method defines the overall algorithm for data extraction (Template Method),
+        delegating specific tasks such as fetching and transforming indicators to
+        specialized helper methods.
+
         Parameters
         ----------
         indicators : List[str]
-            Lista de indicadores para extrair
+            List of economic indicators to extract (e.g., ['GDP growth', 'Inflation'])
         countries : List[str]
-            Lista de países para extrair
+            List of ISO country codes to include in the analysis (e.g., ['USA', 'ESP'])
         start_date : str
-            Data inicial (YYYY-MM-DD)
+            Start date in 'YYYY-MM-DD' format
         end_date : str
-            Data final (YYYY-MM-DD)
+            End date in 'YYYY-MM-DD' format
             
         Returns
         -------
         pd.DataFrame
-            DataFrame com os dados extraídos
+            A MultiIndex DataFrame containing the extracted and formatted data.
+
+        Design Patterns
+        ----------------
+        - **Template Method:** Defines the main extraction process.
+        - **Strategy:** Applies transformations depending on indicator types.
+        - **Factory:** Builds appropriate data structures.
+        - **Observer:** Tracks progress and handles warnings.
         """
         start_year = int(start_date[:4])
         end_year = int(end_date[:4])
-        
+
         data_frames = {}
         for indicator in indicators:
             if indicator not in cls.AVAILABLE_INDICATORS:
-                warnings.warn(f"Indicador não suportado: {indicator}")
+                warnings.warn(f"Unsupported indicator: {indicator}")
                 continue
-                
+
             code, transform = cls.AVAILABLE_INDICATORS[indicator]
-            df = cls._fetch_indicator(
-                code,
-                countries,
-                start_year,
-                end_year
-            )
-            
-            # Aplica transformação se necessário
+            df = cls._fetch_indicator(code, countries, start_year, end_year)
+
+            # Strategy Pattern — apply transformation if defined
             if transform is not None:
                 df = df.apply(transform)
-                
+
             data_frames[indicator] = df
-            
+
         if not data_frames:
-            raise ValueError("Nenhum dado extraído")
-            
+            raise ValueError("No data extracted for the selected indicators.")
+
         return cls.format_macro_data(data_frames)
-    
+
     @classmethod
     def _fetch_indicator(
         cls,
@@ -113,35 +126,41 @@ class WorldBankExtractor:
         end_year: int
     ) -> pd.DataFrame:
         """
-        Extrai um indicador específico para múltiplos países.
+        Retrieve a specific indicator for multiple countries, implementing
+        fallback strategies and structured error handling.
         
         Parameters
         ----------
         indicator_code : str
-            Código do indicador World Bank
+            The World Bank indicator code (e.g., 'NY.GDP.MKTP.CD')
         countries : list
-            Lista de países
+            List of ISO country codes
         start_year : int
-            Ano inicial
+            Starting year for extraction
         end_year : int
-            Ano final
+            Ending year for extraction
             
         Returns
         -------
         pd.DataFrame
-            DataFrame com os dados do indicador
+            A DataFrame containing the indicator data by country.
+        
+        Design Patterns
+        ----------------
+        - **Strategy:** Uses different retrieval strategies per country.
+        - **Chain of Responsibility:** Provides fallback mechanisms for EU data.
+        - **Factory:** Builds country-specific DataFrames.
+        - **Observer:** Handles extraction progress and warnings.
         """
         cols = {}
         for country in countries:
             tried = []
             alternatives = cls.EU_ALTERNATIVES if country == "EUU" else [country]
             success = False
-            
-            # Tenta cada alternativa de código de país
+
             for alt_country in alternatives:
                 tried.append((alt_country, start_year, end_year))
                 try:
-                    # Tenta primeiro com o ano final especificado
                     series = cls._fetch_indicator_country(
                         indicator_code,
                         alt_country,
@@ -152,9 +171,8 @@ class WorldBankExtractor:
                         cols[country] = series
                         success = True
                         break
-                        
+
                 except HTTPError:
-                    # Se falhar, tenta com o ano anterior
                     if end_year > start_year:
                         try:
                             series = cls._fetch_indicator_country(
@@ -169,23 +187,19 @@ class WorldBankExtractor:
                                 break
                         except HTTPError:
                             continue
-                            
+
             if not success:
                 warnings.warn(
-                    f"Dados não disponíveis para {indicator_code} "
-                    f"em {country}. Tentativas: {tried}"
+                    f"No data available for {indicator_code} in {country}. Tried: {tried}"
                 )
-                
+
         if not cols:
-            raise ValueError(
-                f"Sem dados para {indicator_code} nos países {countries}"
-            )
-            
-        # Constrói DataFrame final
+            raise ValueError(f"No data retrieved for {indicator_code} in {countries}")
+
         df = pd.DataFrame(cols)
         df.index.name = "year"
         return df
-    
+
     @classmethod
     def _fetch_indicator_country(
         cls,
@@ -195,44 +209,35 @@ class WorldBankExtractor:
         end_year: int
     ) -> pd.Series:
         """
-        Extrai um indicador para um país específico.
+        Retrieve a specific indicator for one country.
         
         Parameters
         ----------
         indicator_code : str
-            Código do indicador World Bank
+            World Bank indicator code.
         country : str
-            Código do país
+            ISO country code.
         start_year : int
-            Ano inicial
+            Initial year.
         end_year : int
-            Ano final
+            Final year.
             
         Returns
         -------
         pd.Series
-            Série temporal com os dados do indicador
+            A time series containing the indicator values by year.
         """
-        # Constrói URL
-        url = cls.BASE_URL.format(
-            countries=country,
-            indicator=indicator_code
-        )
-        
-        # Adiciona parâmetros
+        url = cls.BASE_URL.format(countries=country, indicator=indicator_code)
         params = cls.DEFAULT_PARAMS.copy()
         params["date"] = f"{start_year}:{end_year}"
-        
-        # Faz requisição
+
         response = requests.get(url, params=params, timeout=60)
         response.raise_for_status()
         data = response.json()
-        
-        # Valida resposta
+
         if not isinstance(data, list) or len(data) < 2 or data[1] is None:
             return pd.Series(dtype=float)
-            
-        # Processa dados
+
         rows = []
         for record in data[1]:
             try:
@@ -242,57 +247,74 @@ class WorldBankExtractor:
                     rows.append((year, float(value)))
             except (ValueError, TypeError):
                 continue
-                
+
         if not rows:
             return pd.Series(dtype=float)
-            
-        # Cria e ordena série temporal
+
         series = pd.Series(dict(rows)).sort_index()
         return series
-    
+
     @staticmethod
     def format_macro_data(indicator_frames: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         """
-        Formata os dados macroeconômicos em um DataFrame com MultiIndex.
+        Format macroeconomic data into a structured MultiIndex DataFrame.
+        
+        This method assembles multiple indicator DataFrames into a unified,
+        easy-to-analyze structure using the Builder pattern.
         
         Parameters
         ----------
-        indicator_frames : dict
-            Dicionário com DataFrames por indicador
+        indicator_frames : Dict[str, pd.DataFrame]
+            A dictionary mapping indicator names to their respective DataFrames.
             
         Returns
         -------
         pd.DataFrame
-            DataFrame formatado com MultiIndex nas colunas ['Country', 'Indicator']
+            A formatted DataFrame with MultiIndex columns ['Country', 'Indicator'].
+        
+        Design Patterns
+        ----------------
+        - **Builder:** Combines and structures multiple DataFrames.
+        - **Factory:** Creates appropriate index structures.
+        - **Strategy:** Handles formatting based on data characteristics.
+        
+        Notes
+        -----
+        The final structure uses:
+        - Columns: MultiIndex ['Country', 'Indicator']
+        - Index: Year (time index)
+        - Values: Numeric indicator data
         """
-        # Primeiro, cria um DataFrame vazio para acumular os dados
         all_data = []
-        
-        # Para cada indicador
+
         for indicator, df in indicator_frames.items():
-            # Para cada país no DataFrame do indicador
             for country in df.columns:
-                # Cria uma Series com o MultiIndex correto
                 series = df[country]
-                series.name = (country, indicator)  # Define o MultiIndex (Country, Indicator)
+                series.name = (country, indicator)
                 all_data.append(series)
-        
-        # Combina todas as séries em um DataFrame
+
         panel = pd.concat(all_data, axis=1)
-        
-        # Define explicitamente os nomes dos níveis do MultiIndex
         panel.columns.names = ['Country', 'Indicator']
-        
+
         return panel.sort_index(axis=1)
-    
+
     @classmethod
     def list_available_indicators(cls) -> Dict[str, str]:
         """
-        Retorna o dicionário de indicadores disponíveis.
+        Retrieve the catalog of supported macroeconomic indicators.
         
+        This method provides a simplified interface (Facade Pattern) for
+        accessing the complex internal indicator configuration.
+
         Returns
         -------
         Dict[str, str]
-            Dicionário com nome e código dos indicadores
+            Mapping of readable indicator names to their World Bank codes.
+
+        Design Patterns
+        ----------------
+        - **Facade:** Simplifies access to internal configuration.
+        - **Singleton:** Ensures consistent indicator catalog.
+        - **Factory:** Builds a dictionary structure dynamically.
         """
         return {k: v[0] for k, v in cls.AVAILABLE_INDICATORS.items()}

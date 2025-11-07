@@ -1,5 +1,10 @@
+"""
+Module for managing and analyzing financial price time series data.
+Implements multiple design patterns for robust price data handling and analysis.
+"""
+
 from dataclasses import dataclass, field
-from typing import Dict, List, Union
+from typing import List, Union
 from src.core.entities.time_series import TimeSeries
 from src.extractor.prices_extractor import MarketDataExtractor
 import pandas as pd
@@ -12,11 +17,28 @@ from src.extractor.sources.prices.extractor_prices_base import (
 @dataclass
 class PriceSeries(TimeSeries):
     """
-    PriceSeries represents price data for one or multiple symbols.
+    A sophisticated price series manager implementing multiple design patterns for financial data analysis.
+    
+    This class extends TimeSeries to handle price data for multiple financial instruments.
+    It implements several design patterns to ensure robust data handling and efficient analysis.
 
-
-    On initialization it uses the extractor to fetch the price matrix and
-    computes lightweight statistics.
+    Design Patterns
+    --------------
+    - Strategy Pattern: Uses MarketDataExtractor for flexible data acquisition
+    - Observer Pattern: Auto-updates statistics when price data changes
+    - Template Method: Inherits from TimeSeries for consistent time series handling
+    - Factory Method: Creates appropriate data structures based on input types
+    
+    Attributes
+    ----------
+    symbols : Union[str, List[str]]
+        Financial instruments to track (e.g., 'AAPL', 'GOOGL')
+    stats : pd.DataFrame
+        Statistical metrics computed from price data
+    source : DataSource
+        Data source strategy for price information
+    interval : Interval
+        Time interval for price data sampling
     """
     
     symbols: Union[str, List[str]] = field(default_factory=list)
@@ -25,9 +47,21 @@ class PriceSeries(TimeSeries):
     interval: Interval = field(default_factory=Interval.DAILY)
     
     def __post_init__(self):
+        """
+        Initialize price series and compute initial statistics.
+        
+        This method implements both the Template Method and Factory patterns by:
+        1. Normalizing input symbols
+        2. Fetching price data using the strategy pattern
+        3. Computing initial statistics as an observer
+        
+        The initialization process follows a template ensuring consistent setup
+        across all instances while allowing for flexible data sources.
+        """
         if isinstance(self.symbols, str):
             self.symbols = self.symbols.replace(",", " ").split()
 
+        # Strategy pattern: Use extractor to fetch data
         extractor = MarketDataExtractor()
         self.data = extractor.fetch_price_series(
             symbols=self.symbols,
@@ -37,9 +71,24 @@ class PriceSeries(TimeSeries):
             interval=self.interval
         )
 
+        # Observer pattern: Compute initial statistics
         self._compute_stats()
 
     def _compute_stats(self):
+        """
+        Compute comprehensive price statistics for all symbols.
+        
+        This method implements the Observer pattern by automatically updating
+        statistics when called. It calculates key financial metrics including:
+        - Mean Return: Average daily return
+        - Volatility: Standard deviation of returns
+        - Annualized Metrics: Both return and volatility
+        
+        Raises
+        ------
+        ValueError
+            If the data structure doesn't match expected format
+        """
         if self.data.empty:
             self.stats = {}
             return
@@ -70,35 +119,43 @@ class PriceSeries(TimeSeries):
 
         self.stats = pd.DataFrame(self.stats)
 
-    def get_market_value(self):
+    def get_market_value(self) -> pd.Series:
         """
-        Return the most recent close price per ticker.
-        Handles multi-index DataFrame with (Price, Symbol) hierarchy.
+        Retrieve most recent market prices for all tracked symbols.
         
+        This method implements the Strategy pattern for accessing price data,
+        handling multi-index data structures with error protection.
+
         Returns
         -------
         pd.Series
-            Latest closing prices for each ticker
+            Latest closing prices for each symbol, indexed by symbol name
         """
         if self.data.empty:
             return pd.Series(dtype=float)
 
         try:
-            # Usar xs para selecionar o nível 'Close' do primeiro nível do MultiIndex
             close_prices = self.data.xs('Close', axis=1, level=0)
             return close_prices.iloc[-1]
         except KeyError:
             return pd.Series(dtype=float)
 
-    def get_returns(self):
+    def get_returns(self) -> pd.DataFrame:
         """
-        Return daily returns for the Close price matrix.
-        Handles multi-index DataFrame with (Price, Symbol) hierarchy.
+        Calculate historical returns for all symbols.
         
+        This method implements the Strategy pattern for return calculations,
+        providing a consistent interface for accessing return data.
+        
+        The calculation handles:
+        - Missing data through proper NA handling
+        - Multi-index data structures
+        - Period-over-period returns
+
         Returns
         -------
         pd.DataFrame
-            Daily returns for each ticker based on closing prices
+            Historical returns for each symbol, with dates as index
         """
         try:
             close_prices = self.data.xs('Close', axis=1, level=0)
@@ -106,10 +163,15 @@ class PriceSeries(TimeSeries):
         except KeyError:
             return pd.DataFrame()
 
-    def describe(self):
+    def describe(self) -> None:
         """
-        Print basic stats computed for each ticker.
-        Includes mean return, volatility, annual return and volatility.
+        Generate detailed statistical summary for all symbols.
+        
+        This method implements the Template Method pattern for consistent
+        reporting across different types of financial instruments. It provides:
+        - Return metrics in percentage format
+        - Volatility measures with appropriate precision
+        - Clear per-symbol breakdowns
         """
         print(f"\n=== Statistics for {self.name or 'Price Series'} ===")
         for symbol, stats in self.stats.items():

@@ -1,96 +1,96 @@
-# 📊 Tarea 1 - MIAX
+# 📊 Análisis Financiero y Simulación Monte Carlo
 
-Ferramenta modular para **obtenção, padronização e análise de dados financeiros** (ações, índices, carteiras e simulações de Monte Carlo).
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-Este projeto faz parte de uma tarefa do programa Master e tem como objetivo praticar **boas práticas de arquitetura, abstração e padronização de código** para projetos escaláveis.
+Herramienta modular para la **obtención, estandarización y análisis de datos financieros** (acciones, índices, carteras y simulaciones de Monte Carlo).
 
----
-
-## 🧱 Estrutura do Projeto
-
-tarea_bloque_1_introduccion/
-├── src/
-│   ├── __init__.py
-│   │
-│   ├── core/                     # Núcleo lógico do projeto (modelos e cálculos)
-│   │   ├── __init__.py
-│   │   ├── dataclasses.py        # Classes: PriceSeries, Portfolio
-│   │   ├── montecarlo.py         # Simulação de Monte Carlo
-│   │   ├── statistics.py         # Funções estatísticas gerais (média, desvio, etc.)
-│   │   ├── transformer.py        # Limpeza e padronização dos dados
-│   │   └── loader.py             # Salvamento de dados processados (parte do ETL)
-│   │
-│   ├── extractor/                # Módulo de extração (ETL: Extract)
-│   │   ├── __init__.py
-│   │   ├── api_extractor.py      # Classe central de extração (coordena fontes)
-│   │   └── sources/              # Módulos específicos por fonte
-│   │       ├── __init__.py
-│   │       ├── yahoo.py
-│   │       ├── alphavantage.py
-│   │       ├── fmp.py
-│   │       └── eodhd.py
-│   │
-│   ├── portfolios/               # Lógica de carteiras e agregações
-│   │   ├── __init__.py
-│   │   ├── portfolio_builder.py  # Criação de carteiras a partir de séries de preços
-│   │   ├── optimization.py       # (futuro) otimização de pesos e métricas
-│   │   └── risk.py               # Cálculos de volatilidade, covariância, etc.
-│   │
-│   ├── reports/                  # Geração de relatórios e visualizações
-│   │   ├── __init__.py
-│   │   ├── report_generator.py   # .report() e exportação Markdown
-│   │   ├── plots.py              # .plots_report() e geração de gráficos
-│   │   └── templates/            # (opcional) templates Markdown/HTML
-│   │
-│   ├── interfaces/               # Interações com o usuário
-│   │   ├── __init__.py
-│   │   ├── cli.py                # Interface via linha de comando
-│   │   └── api_interface.py      # (futuro) interface REST se for expandido
-│   │
-│   └── utils/                    # Funções auxiliares genéricas
-│       ├── __init__.py
-│       ├── io.py                 # Leitura/escrita de dados e controle de diretórios
-│       ├── config.py             # Configurações globais e leitura de .env
-│       ├── logging_config.py     # Setup de logs
-│       └── exceptions.py         # Definições de erros personalizados
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── output/
-│
-├── tests/
-│   ├── test_extractor.py
-│   ├── test_transformer.py
-│   ├── test_portfolio.py
-│   └── test_montecarlo.py
-│
-├── examples/
-│   ├── quickstart.py
-│   └── montecarlo_demo.py
-│
-├── .venv/
-├── .gitignore
-├── .env
-├── .dockerignore
-├── LICENSE
-├── requirements.txt
-├── setup.cfg
-├── Dockerfile
-└── README.md
+Este proyecto forma parte del Máster en Inteligencia Artificial y Finanzas Cuantitativas (MIAX), con el objetivo de implementar **buenas prácticas de arquitectura, abstracción y estandarización de código** para proyectos escalables.
 
 ---
 
-## 🚀 Funcionalidades Principais
+## 🧱 Estructura del Proyecto
 
-- Extração de dados históricos de **múltiplas APIs** (ex: Yahoo Finance, Alpha Vantage)
-- Padronização do formato de dados independente da origem
-- Criação de **DataClasses** para séries temporais e carteiras
-- Estatísticas automáticas (média, desvio padrão)
-- **Simulação de Monte Carlo** da evolução de ativos ou carteiras
-- Geração de **relatórios formatados em Markdown**
-- Criação automática de gráficos e visualizações (.plots_report)
-- Projeto pronto para rodar em **Docker** 🐳
+```
+├── data/                  # Datos de entrada y salida
+│   ├── raw/              # Datos sin procesar
+│   ├── processed/        # Datos procesados
+│   ├── output/           # Resultados generados
+│   └── reports/          # Informes y visualizaciones
+│
+├── examples/             # Ejemplos de uso
+│   ├── quickstart_price_series.py
+│   ├── quickstart_monte_carlo.py
+│   └── quickstart_macro.py
+│
+├── src/                  # Código fuente
+│   ├── analysis/         # Módulos de análisis
+│   │   └── entities/     # Entidades de análisis Monte Carlo
+│   │
+│   ├── core/            # Entidades principales
+│   │   └── entities/    # Series temporales y carteras
+│   │
+│   ├── extractor/       # Extractores de datos
+│   │   └── sources/     # Fuentes de datos (Yahoo, Alpha Vantage, etc.)
+│   │
+│   ├── plots/           # Visualizaciones
+│   │
+│   └── reports/         # Generación de informes
+│
+└── tests/               # Tests unitarios
+```
+
+### 🔧 Patrones de Diseño Implementados
+
+- **Strategy Pattern**: Extractores de datos y análisis
+- **Template Method**: Generación de informes
+- **Observer Pattern**: Monitoreo de simulaciones
+- **Chain of Responsibility**: Procesamiento de métricas
+- **Factory Method**: Creación de extractores
+- **Builder Pattern**: Construcción de simulaciones
+- **Bridge Pattern**: Abstracción de visualizaciones
+
+---
+
+## 🚀 Características Principales
+
+### 📈 Análisis de Series de Precios
+- Extracción de datos históricos de **múltiples APIs**:
+  - Yahoo Finance
+  - Alpha Vantage
+  - Financial Modeling Prep
+  - EOD Historical Data
+- Estandarización automática de datos
+- Cálculo de métricas financieras
+- Visualizaciones interactivas
+
+### 💹 Simulación Monte Carlo
+- Simulación de evolución de activos
+- Análisis de carteras de inversión
+- Generación de escenarios múltiples
+- Métricas de riesgo y rendimiento:
+  - VaR (Value at Risk)
+  - CVaR (Conditional VaR)
+  - Drawdown análisis
+  - Estadísticas de retorno
+
+### 📊 Análisis Macroeconómico
+- Integración con datos del Banco Mundial
+- Análisis de indicadores económicos
+- Series temporales macroeconómicas
+- Correlaciones entre indicadores
+
+### 📋 Informes y Visualización
+- Generación automática de informes en Markdown
+- Gráficos interactivos y estáticos
+- Análisis detallado de resultados
+- Exportación de datos procesados
+
+### 🔄 Infraestructura
+- Arquitectura modular y escalable
+- Implementación de patrones de diseño
+- Tests unitarios completos
+- Contenedorización con Docker 🐳
 
 ---
 
@@ -99,6 +99,6 @@ tarea_bloque_1_introduccion/
 ### 🔹 Opção 1: Local
 
 ```bash
-git clone https://github.com/SEU-USUARIO/portfolio-toolkit.git
+git clone https://github.com/piettro/Master-MIAX-Tarea-Bloque1-Introduccion.git
 cd portfolio-toolkit
 pip install -r requirements.txt

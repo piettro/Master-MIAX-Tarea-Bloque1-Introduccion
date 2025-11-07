@@ -1,118 +1,157 @@
 """
-Relatório especializado para análise de séries macroeconômicas.
-Gera relatórios completos com visualizações e análises de indicadores.
+Specialized report for macroeconomic time series analysis.
+Generates complete reports with visualizations and analyses of indicators.
 """
 
 from pathlib import Path
-from typing import Any, Optional, List, Union
-
+from typing import List, Union
+import pandas as pd
 from src.core.entities.macro_series import MacroSeries
 from src.reports.report_base import BaseReport
-from src.plots.plot_macro import VisualizadorMacroSeries
-import pandas as pd
+from src.plots.plot_macro import MacroSeriesVisualizer
 
 class MacroReport(BaseReport):
+    """Report generator for macroeconomic series analysis."""
+
     def __init__(
         self,
-        macro_series: MacroSeries,  
-        titulo: str = "Relatório de Análise Macroeconômica",
+        macro_series: MacroSeries,
+        title: str = "Macroeconomic Analysis Report",
         include_plots: bool = True,
-        include_tables: bool = True
-    ):
-        super().__init__(
-            titulo=titulo,
-            include_plots=include_plots,
-            include_tables=include_tables
-        )
+        include_tables: bool = True,
+    ) -> None:
+        """Initialize MacroReport.
+
+        Args:
+            macro_series (MacroSeries): Domain object that contains the
+                multi-country, multi-indicator DataFrame in `.data`.
+            title (str, optional): Report title. Defaults to
+                "Macroeconomic Analysis Report".
+            include_plots (bool, optional): Whether to include plots.
+                Defaults to True.
+            include_tables (bool, optional): Whether to include tables.
+                Defaults to True.
+
+        Raises:
+            ValueError: If the underlying DataFrame columns are not a
+                MultiIndex with names ['Country', 'Indicator'].
+        """
+        super().__init__(title=title, include_plots=include_plots, include_tables=include_tables)
 
         self.macro_series = macro_series
         self.data = macro_series.data
 
-        if not isinstance(self.data.columns, pd.MultiIndex) or \
-           self.data.columns.names != ['Country', 'Indicator']:
-            raise ValueError("DataFrame esperado com MultiIndex nas colunas: ['Country', 'Indicator']")
-        
-        self.countries = self.data.columns.get_level_values('Country').unique().tolist()
-        self.indicators = self.data.columns.get_level_values('Indicator').unique().tolist()
-        self.visualizadores = {}
+        # Expecting a MultiIndex on columns with levels: ['Country', 'Indicator']
+        if not isinstance(self.data.columns, pd.MultiIndex) or self.data.columns.names != ['Country', 'Indicator']:
+            raise ValueError("Expected DataFrame with MultiIndex columns: ['Country', 'Indicator']")
+
+        self.countries: List[str] = self.data.columns.get_level_values('Country').unique().tolist()
+        self.indicators: List[str] = self.data.columns.get_level_values('Indicator').unique().tolist()
+        self.visualizers: dict = {}
 
     def _prepare_indicator_data(self, indicator: str) -> pd.DataFrame:
-        """
-        Prepara DataFrame para um indicador, incluindo todos os países.
+        """Prepare a DataFrame containing the specified indicator for all countries.
+
+        The returned DataFrame has countries as columns and a PeriodIndex (yearly).
+
+        Args:
+            indicator (str): Indicator name to extract.
+
+        Returns:
+            pd.DataFrame: Cleaned DataFrame for the indicator.
+
+        Raises:
+            ValueError: If no valid data exists for the given indicator or
+                an error occurs during preparation.
         """
         try:
-            # Seleciona todos os países para o indicador
+            # Select all countries for the given indicator
             df = self.data.xs(indicator, level='Indicator', axis=1)
-            
-            # Remove valores nulos
+
+            # Drop columns that are entirely NaN
             df = df.dropna(how='all')
-            
+
             if df.empty:
-                raise ValueError(f"Sem dados válidos para o indicador {indicator}")
-            
-            # Converte índice para período anual
+                raise ValueError(f"No valid data available for indicator '{indicator}'.")
+
+            # Convert index to yearly PeriodIndex for consistent handling
             df.index = pd.PeriodIndex(df.index, freq='Y')
-            
+
             return df
-            
-        except Exception as e:
-            raise ValueError(f"Erro ao preparar dados para {indicator}: {str(e)}")
+
+        except Exception as exc:
+            raise ValueError(f"Error preparing data for indicator '{indicator}': {exc}") from exc
 
     def _add_info_section(self, indicator: str) -> None:
+        """Add a brief information section about the indicator.
+
+        Includes analysis period and total variation per country.
+
+        Args:
+            indicator (str): Indicator to describe.
+        """
         df = self._prepare_indicator_data(indicator)
-        
-        # Ordena o índice
+
+        # Ensure chronological order
         df = df.sort_index()
-        
-        # Pega os anos inicial e final
+
         start = str(df.index.min())
         end = str(df.index.max())
-        
-        # Informações por país
-        info_paises = []
+
+        # Prepare variation info per country
+        country_infos: List[str] = []
         for country in df.columns:
             series = df[country].dropna()
             if not series.empty:
-                inicial = series.iloc[0]
-                final = series.iloc[-1]
-                if pd.notna(inicial) and pd.notna(final) and inicial != 0:
-                    variacao = f"{(final/inicial - 1)*100:.2f}%"
+                first_value = series.iloc[0]
+                last_value = series.iloc[-1]
+                if pd.notna(first_value) and pd.notna(last_value) and first_value != 0:
+                    variation = f"{(last_value / first_value - 1) * 100:.2f}%"
                 else:
-                    variacao = "N/A"
-                info_paises.append(f"- **{country}**: {variacao}")
-        
-        self.add_section(
-            f"Informações do Indicador: {indicator}",
-            f"### Período de Análise\n"
-            f"- De: {start}\n"
-            f"- Até: {end}\n\n"
-            f"### Variação Total por País\n" +
-            "\n".join(info_paises),
-            level=2
+                    variation = "N/A"
+                country_infos.append(f"- **{country}**: {variation}")
+
+        content = (
+            f"### Analysis Period\n"
+            f"- From: {start}\n"
+            f"- To: {end}\n\n"
+            f"### Total Variation by Country\n" +
+            ("\n".join(country_infos) if country_infos else "No valid series available for any country.")
         )
 
+        self.add_section(f"Indicator Summary: {indicator}", content, level=2)
+
     def _add_statistical_analysis(self, indicator: str) -> None:
+        """Add descriptive statistics table for the indicator across countries.
+
+        Args:
+            indicator (str): Indicator to analyze.
+        """
         df = self._prepare_indicator_data(indicator)
-        # Calcula estatísticas para cada país
+
+        # Compute descriptive statistics per country
         stats_list = []
         for country in df.columns:
             stats = df[country].describe()
             stats.name = country
             stats_list.append(stats)
-        
+
         stats_df = pd.concat(stats_list, axis=1)
         stats_df = stats_df.reset_index(names='Stats')
-        
-        self.add_table(
-            stats_df,
-            f"Estatísticas Descritivas: {indicator}",
-            level=3,
-            format_dict={col: (lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x) for col in stats_df.columns}
-        )
+
+        # Formatting function for numeric values
+        format_dict = {col: (lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x) for col in stats_df.columns}
+
+        self.add_table(stats_df, f"Descriptive Statistics: {indicator}", level=3, format_dict=format_dict)
 
     def _add_variation_analysis(self, indicator: str) -> None:
+        """Add annual percentage variation analysis and corresponding table.
+
+        Args:
+            indicator (str): Indicator to analyze.
+        """
         df = self._prepare_indicator_data(indicator)
-        # Calcula variação para cada país
+
         variations_list = []
         for country in df.columns:
             var = df[country].pct_change(periods=1).dropna()
@@ -120,120 +159,131 @@ class MacroReport(BaseReport):
                 stats = var.describe()
                 stats.name = country
                 variations_list.append(stats)
-            
+
         if variations_list:
             variations_df = pd.concat(variations_list, axis=1)
             variations_df = variations_df.reset_index(names='Stats')
-            self.add_table(
-                variations_df,
-                f"Variação Percentual Anual: {indicator}",
-                level=3,
-                format_dict={col: (lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x) for col in variations_df.columns}
-            )
+            format_dict = {col: (lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else x) for col in variations_df.columns}
+            self.add_table(variations_df, f"Annual Percentage Variation: {indicator}", level=3, format_dict=format_dict)
         else:
             self.add_section(
-                f"Variação Percentual Anual: {indicator}",
-                "Não há dados suficientes para calcular as variações anuais.",
+                f"Annual Percentage Variation: {indicator}",
+                "Not enough data to compute annual variations.",
                 level=3
             )
 
     def _add_visualizations(self, indicator: str) -> None:
+        """Generate and add visualization plots for the indicator.
+
+        Plots include:
+            - Time series for all countries
+            - Annual variation (if available)
+            - Decomposition and seasonality per country
+
+        Args:
+            indicator (str): Indicator to visualize.
+        """
         df = self._prepare_indicator_data(indicator)
-        viz = VisualizadorMacroSeries(df)
+        viz = MacroSeriesVisualizer(df)
 
         if self.include_plots:
-            # Gráfico de série temporal com todos os países
-            fig1 = viz.plot_serie_temporal()
-            self.add_plot(fig1, f"Série Temporal - {indicator}", level=3)
+            # Time series for all countries
+            fig1 = viz.plot_time_series()
+            self.add_plot(fig1, f"Time Series - {indicator}", level=3)
 
-            # Gráfico de variação anual com todos os países
+            # Annual variation (may fail if not applicable)
             try:
-                fig2 = viz.plot_variacao_anual()
-                self.add_plot(fig2, f"Variação Anual - {indicator}", level=3)
-            except Exception as e:
+                fig2 = viz.plot_annual_variation()
+                self.add_plot(fig2, f"Annual Variation - {indicator}", level=3)
+            except Exception as exc:
                 self.add_section(
-                    f"Aviso - Variação Anual {indicator}",
-                    f"Não foi possível gerar o gráfico de variação anual: {str(e)}",
+                    f"Warning - Annual Variation {indicator}",
+                    f"Could not generate annual variation plot: {exc}",
                     level=3
                 )
 
-            # Para decomposição e sazonalidade, ainda fazemos por país pois são análises específicas
+            # Decomposition and seasonality — do per country since the analysis is specific
             for country in df.columns:
                 country_df = pd.DataFrame({country: df[country]})
-                country_viz = VisualizadorMacroSeries(country_df)
+                country_viz = MacroSeriesVisualizer(country_df)
 
-                fig3 = country_viz.plot_decomposicao(indicador=country)
-                self.add_plot(fig3, f"Decomposição: {indicator} - {country}", level=3)
+                # Use a safe call for decomposition (some series may not be decomposable)
+                try:
+                    fig3 = country_viz.plot_decomposition(indicator=country)
+                    self.add_plot(fig3, f"Decomposition: {indicator} - {country}", level=3)
+                except Exception as exc:
+                    self.add_section(
+                        f"Warning - Decomposition {indicator} - {country}",
+                        f"Could not generate decomposition: {exc}",
+                        level=3
+                    )
 
     def _add_correlation_analysis(self, indicator: str) -> None:
-        """
-        Realiza análise de correlação entre países para um indicador.
+        """Perform correlation analysis between countries for a given indicator.
+
+        Adds both a correlation table and an optional heatmap plot.
+
+        Args:
+            indicator (str): Indicator to analyze.
         """
         try:
-            # Extrai dados para o indicador específico
+            # Extract data for this indicator
             df_corr = self.data.xs(indicator, level='Indicator', axis=1)
-            
-            # Remove valores nulos antes do cálculo de correlação
+
+            # Drop rows or columns with missing data before correlation
             df_corr = df_corr.dropna()
-            
+
             if df_corr.empty:
-                raise ValueError(f"Sem dados válidos para correlação do indicador {indicator}")
-                
-            # Calcula correlação
-            corr = df_corr.corr().round(3)  # Arredonda para 3 casas decimais
-            
-            # Adiciona tabela de correlação
-            self.add_table(
-                corr,
-                f"Matriz de Correlação entre Países ({indicator})",
-                level=3,
-                format_dict={col: lambda x: f"{x:.3f}" for col in corr.columns}
-            )
-            
-            # Adiciona visualização
+                raise ValueError(f"No valid data for correlation on indicator '{indicator}'.")
+
+            # Compute correlation matrix and round to 3 decimals
+            corr = df_corr.corr().round(3)
+
+            # Formatting for table display
+            format_dict = {col: (lambda x: f"{x:.3f}") for col in corr.columns}
+
+            self.add_table(corr, f"Country Correlation Matrix ({indicator})", level=3, format_dict=format_dict)
+
+            # Add heatmap if plots are enabled
             if self.include_plots:
+                import matplotlib.pyplot as plt  # local import to avoid heavy import when not plotting
                 import seaborn as sns
-                import matplotlib.pyplot as plt
-                
+
                 fig, ax = plt.subplots(figsize=(8, 6))
-                sns.heatmap(
-                    corr, 
-                    annot=True, 
-                    cmap='coolwarm',
-                    center=0,
-                    fmt='.3f',
-                    ax=ax
-                )
-                ax.set_title(f"Heatmap de Correlação: {indicator}")
+                sns.heatmap(corr, annot=True, cmap='coolwarm', center=0, fmt='.3f', ax=ax)
+                ax.set_title(f"Correlation Heatmap: {indicator}")
                 plt.tight_layout()
-                self.add_plot(fig, f"Heatmap de Correlação: {indicator}", level=3)
-                
-        except Exception as e:
+                self.add_plot(fig, f"Correlation Heatmap: {indicator}", level=3)
+
+        except Exception as exc:
             self.add_section(
-                f"Erro na Análise de Correlação ({indicator})",
-                f"Não foi possível gerar a análise de correlação: {str(e)}",
+                f"Error in Correlation Analysis ({indicator})",
+                f"Could not generate correlation analysis: {exc}",
                 level=3
             )
 
     def generate(self, auto_save: bool = True) -> Union[str, Path]:
+        """Generate the full macroeconomic report and optionally save it.
+
+        The report composes sections for each indicator:
+            - Basic info and period
+            - Descriptive statistics
+            - Annual variation tables
+            - Visualizations (time series, variation, decomposition)
+            - Correlation analysis
+
+        Args:
+            auto_save (bool, optional): If True, automatically saves the report
+                after generation. Defaults to True.
+
+        Returns:
+            Union[str, Path]: If auto_save is True returns the saved Path.
+                Otherwise returns the report content in Markdown as a string.
         """
-        Gera o conteúdo do relatório macroeconômico e opcionalmente salva em arquivo.
-        
-        Parameters
-        ----------
-        auto_save : bool, opcional
-            Se True, salva automaticamente o relatório após gerar (default: True)
-            
-        Returns
-        -------
-        Union[str, Path]
-            Se auto_save=True: Path do arquivo salvo
-            Se auto_save=False: Conteúdo do relatório em formato Markdown
-        """
-        # Limpa seções anteriores
+        # Reset previous sections
         self.sections = []
-        
-        relatorios_gerados = []
+
+        generated_reports: List[str] = []
         for indicator in self.indicators:
             try:
                 self._add_info_section(indicator)
@@ -241,24 +291,27 @@ class MacroReport(BaseReport):
                 self._add_variation_analysis(indicator)
                 self._add_visualizations(indicator)
                 self._add_correlation_analysis(indicator)
-                relatorios_gerados.append(indicator)
-            except Exception as e:
+                generated_reports.append(indicator)
+            except Exception as exc:
                 self.add_section(
-                    f"Erro ao processar {indicator}",
-                    f"Detalhes: {str(e)}",
+                    f"Error processing {indicator}",
+                    f"Details: {exc}",
                     level=3
                 )
+            # Separator between indicators
             self.add_section("---", "", level=1)
 
         if auto_save:
+            # `save` is expected to be implemented by BaseReport
             return self.save(custom_name=self.macro_series.name)
 
-        full_report = []
+        # Build Markdown content if not saving to file
+        full_report: List[str] = []
         for section in self.sections:
-            if section['level'] > 0:
-                full_report.append(f"{'#' * section['level']} {section['title']}")
-            if section['content']:
+            if section.get('level', 0) > 0:
+                full_report.append(f"{'#' * section['level']} {section.get('title', '')}")
+            if section.get('content'):
                 full_report.append(section['content'])
             full_report.append("")
-            
+
         return "\n".join(full_report)
