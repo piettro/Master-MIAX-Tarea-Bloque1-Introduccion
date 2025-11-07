@@ -1,6 +1,6 @@
-# 🎨 Diagramas da Arquitetura
+# 🎨 Diagramas de la Arquitectura
 
-## 📊 Diagrama de Classes Principal (Mermaid)
+## 📊 Diagrama de Clases Principal (Mermaid)
 
 ```mermaid
 graph TB
@@ -126,22 +126,22 @@ graph TB
 ```mermaid
 graph LR
     subgraph "Application Layer"
-        A[Examples & CLI]
+        A[Ejemplos y CLI]
     end
     
     subgraph "Service Layer"
-        B[Reports Service]
-        C[Visualization Service]
+        B[Servicio de Informes]
+        C[Servicio de Visualización]
     end
     
     subgraph "Domain Layer"
-        D[Analysis Entities]
-        E[Core Entities]
+        D[Entidades de Análisis]
+        E[Entidades Centrales]
     end
     
     subgraph "Infrastructure Layer"
-        F[Data Extractors]
-        G[External APIs]
+        F[Extractores de Datos]
+        G[APIs Externas]
     end
     
     A --> B
@@ -155,7 +155,7 @@ graph LR
     F --> G
 ```
 
-## 🔄 Diagrama de Fluxo de Dados
+## 🔄 Diagrama de Flujo de Datos
 
 ```mermaid
 sequenceDiagram
@@ -167,57 +167,57 @@ sequenceDiagram
     participant Extractor
     participant API
     
-    User->>CLI: Request Analysis
-    CLI->>Report: Generate Report
-    Report->>Analysis: Run Simulation
-    Analysis->>Core: Get Portfolio Data
-    Core->>Extractor: Fetch Price Data
-    Extractor->>API: API Call
-    API-->>Extractor: Raw Data
-    Extractor-->>Core: Standardized Data
-    Core-->>Analysis: Portfolio Object
-    Analysis-->>Report: Results
-    Report-->>CLI: Formatted Report
-    CLI-->>User: Display Results
+    User->>CLI: Solicitud de Análisis
+    CLI->>Report: Generar Informe
+    Report->>Analysis: Ejecutar Simulación
+    Analysis->>Core: Obtener Datos de Cartera
+    Core->>Extractor: Buscar Datos de Precios
+    Extractor->>API: Llamada API
+    API-->>Extractor: Datos en Bruto
+    Extractor-->>Core: Datos Estandarizados
+    Core-->>Analysis: Objeto Portfolio
+    Analysis-->>Report: Resultados
+    Report-->>CLI: Informe Formateado
+    CLI-->>User: Mostrar Resultados
 ```
 
-## 🎯 Padrões de Design por Módulo
+## 🎯 Patrones de Diseño por Módulo
 
 ```mermaid
 graph TD
     subgraph "Strategy Pattern"
-        S1[Extractors]
-        S2[Analysis Methods]
-        S3[Visualization Types]
+        S1[Extractores]
+        S2[Métodos de Análisis]
+        S3[Tipos de Visualización]
     end
     
     subgraph "Template Method"
-        T1[Report Generation]
-        T2[Analysis Workflow]
-        T3[Data Processing]
+        T1[Generación de Informes]
+        T2[Flujo de Análisis]
+        T3[Procesamiento de Datos]
     end
     
     subgraph "Observer Pattern"
-        O1[Statistics Updates]
-        O2[Data Changes]
-        O3[Progress Monitoring]
+        O1[Actualizaciones de Estadísticas]
+        O2[Cambios de Datos]
+        O3[Monitoreo de Progreso]
     end
     
     subgraph "Factory Method"
-        F1[Extractor Creation]
-        F2[Entity Instantiation]
-        F3[Plot Generation]
+        F1[Creación de Extractores]
+        F2[Instanciación de Entidades]
+        F3[Generación de Gráficos]
     end
 ```
 
-## 📊 Dependências Entre Camadas
+## 📊 Dependencias Entre Capas
 
 ```mermaid
 graph BT
-    Infrastructure[🔌 Infrastructure Layer]
-    Domain[💾 Domain Layer]
-    Service[📊 Service Layer]
-    Application[🎯 Application Layer]
+    Infrastructure[🔌 Capa de Infraestructura]
+    Domain[💾 Capa de Dominio]
+    Service[📊 Capa de Servicio]
+    Application[🎯 Capa de Aplicación]
     
     Domain --> Infrastructure
     Service --> Domain

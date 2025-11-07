@@ -1,6 +1,6 @@
-# 🏗️ Arquitetura do Sistema - Financial Analysis Toolkit
+# 🏗️ Arquitectura del Sistema - Financial Analysis Toolkit
 
-## 📊 Visão Geral da Estrutura
+## 📊 Visión General de la Estructura
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -115,22 +115,22 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 🏛️ Padrões de Arquitetura Implementados
+## 🏛️ Patrones de Arquitectura Implementados
 
-### 📊 Camada de Apresentação (Presentation Layer)
-- **Responsabilidade**: Interface com o usuário
+### 📊 Capa de Presentación (Presentation Layer)
+- **Responsabilidad**: Interfaz con el usuario
 - **Componentes**: Examples, CLI, Reports
-- **Padrões**: Template Method, Observer
+- **Patrones**: Template Method, Observer
 
-### 🧠 Camada de Negócio (Business Layer)
-- **Responsabilidade**: Lógica de análise financeira
+### 🧠 Capa de Negocio (Business Layer)
+- **Responsabilidad**: Lógica de análisis financiero
 - **Componentes**: Analysis entities, Core entities
-- **Padrões**: Strategy, Factory Method, Template Method
+- **Patrones**: Strategy, Factory Method, Template Method
 
-### 🔌 Camada de Dados (Data Layer)
-- **Responsabilidade**: Extração e padronização de dados
+### 🔌 Capa de Datos (Data Layer)
+- **Responsabilidad**: Extracción y estandarización de datos
 - **Componentes**: Extractors, Sources
-- **Padrões**: Strategy, Factory Method, Adapter
+- **Patrones**: Strategy, Factory Method, Adapter
 
 ## 🔧 Design Patterns por Módulo
 
@@ -167,7 +167,7 @@ ExtractorBase (Strategy Pattern)
         └── WorldBankExtractor
 ```
 
-## 📊 Fluxo de Dados
+## 📊 Flujo de Datos
 
 ```
 📊 User Request
@@ -183,26 +183,26 @@ ExtractorBase (Strategy Pattern)
 🌐 External APIs
 ```
 
-## 🎯 Benefícios da Arquitetura
+## 🎯 Beneficios de la Arquitectura
 
-1. **Modularidade**: Cada camada tem responsabilidade específica
-2. **Extensibilidade**: Fácil adição de novas fontes de dados
-3. **Testabilidade**: Componentes isolados permitem testes unitários
-4. **Manutenibilidade**: Código organizado e bem estruturado
-5. **Reutilização**: Componentes podem ser reutilizados em diferentes contextos
+1. **Modularidad**: Cada capa tiene responsabilidad específica
+2. **Extensibilidad**: Fácil adición de nuevas fuentes de datos
+3. **Testabilidad**: Componentes aislados permiten tests unitarios
+4. **Mantenibilidad**: Código organizado y bien estructurado
+5. **Reutilización**: Componentes pueden ser reutilizados en diferentes contextos
 
-## 🔄 Padrões de Design Aplicados
+## 🔄 Patrones de Diseño Aplicados
 
-| Padrão | Localização | Benefício |
+| Patrón | Localización | Beneficio |
 |--------|-------------|-----------|
-| Strategy | Extractors, Analysis | Flexibilidade na escolha de algoritmos |
-| Template Method | Reports, Analysis | Padronização de workflows |
-| Observer | Statistics, Updates | Atualizações automáticas |
-| Factory Method | Extractors | Criação de objetos flexível |
-| Composite | Portfolio | Tratamento uniforme de ativos |
-| Bridge | Plots, Reports | Separação de abstração e implementação |
+| Strategy | Extractors, Analysis | Flexibilidad en la elección de algoritmos |
+| Template Method | Reports, Analysis | Estandarización de workflows |
+| Observer | Statistics, Updates | Actualizaciones automáticas |
+| Factory Method | Extractors | Creación de objetos flexible |
+| Composite | Portfolio | Tratamiento uniforme de activos |
+| Bridge | Plots, Reports | Separación de abstracción e implementación |
 
-## 📚 Dependências Entre Módulos
+## 📚 Dependencias Entre Módulos
 
 ```
 reports/     ──→ plots/       ──→ analysis/
@@ -216,8 +216,8 @@ reports/     ──→ plots/       ──→ analysis/
               External APIs
 ```
 
-Esta arquitetura segue princípios SOLID e permite que o sistema seja:
-- **Escalável**: Fácil adição de novos módulos
-- **Testável**: Cada componente pode ser testado isoladamente
-- **Flexível**: Múltiplas implementações para cada interface
-- **Manutenível**: Código bem organizado e documentado
+Esta arquitectura sigue principios SOLID y permite que el sistema sea:
+- **Escalable**: Fácil adición de nuevos módulos
+- **Testeable**: Cada componente puede ser probado aisladamente
+- **Flexible**: Múltiples implementaciones para cada interfaz
+- **Mantenible**: Código bien organizado y documentado
