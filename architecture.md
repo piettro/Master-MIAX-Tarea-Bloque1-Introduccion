@@ -1,3 +1,9 @@
+
+# 🏗️ System Architecture
+
+## Class Diagram
+
+```mermaid
 classDiagram
     %% Core Entities
     class TimeSeries {
@@ -245,3 +251,14 @@ classDiagram
     
     MonteCarloReport --> MonteCarloBase
     MonteCarloReport --> MonteCarloCalculator
+```
+
+## Key Design Patterns
+
+- **Template Method**: MonteCarloBase, BaseExtractor
+- **Strategy**: Multiple data sources and simulation types  
+- **Factory**: MarketDataExtractor creates specific extractors
+- **Facade**: Portfolio and MarketDataExtractor simplify complex operations
+- **Observer**: Automatic statistics updates
+- **Adapter**: API format standardization
+```
