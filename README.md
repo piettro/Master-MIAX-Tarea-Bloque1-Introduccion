@@ -99,5 +99,8 @@ Este proyecto forma parte del Máster en Inteligencia Artificial y Finanzas Cuan
 
 ```bash
 git clone https://github.com/piettro/Master-MIAX-Tarea-Bloque1-Introduccion.git
-cd portfolio-toolkit
+cd Master-Miax-Tarea-Bloque1-Introduccion
+python -m venv .venv
+call .venv/Scripts/activate
 pip install -r requirements.txt
+python -m examples.quickstart_priceseries
