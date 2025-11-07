@@ -94,7 +94,10 @@ class Portfolio:
         
         if len(quantities) != len(holdings):
             raise ValueError("Number of quantities must match number of holdings.")
-        
+
+        if any(q < 0 for q in quantities):
+            raise ValueError("Quantities must be non-negative.")
+
         self.positions = dict(zip(holdings, quantities))
         
         self.series = PriceSeries(
@@ -170,6 +173,23 @@ class Portfolio:
         """
         return float(self.total_value_per_holding().sum())
     
+    def total_value_initial(self) -> float:
+        """
+        Calculate initial portfolio market value.
+
+        This method implements the Facade pattern by providing a simple
+        interface to access the initial portfolio value.
+
+        Returns
+        -------
+        float
+            Initial portfolio market value
+        """
+        initial = self.series.get_initial_prices()
+        qty = pd.Series(self.positions)
+
+        return float(initial.mul(qty).sum())
+
     def returns(self) -> pd.DataFrame:
         """
         Calculate historical returns for the portfolio.

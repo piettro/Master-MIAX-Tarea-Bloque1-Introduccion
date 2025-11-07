@@ -107,29 +107,41 @@ class MonteCarloVisualizer:
         fig.tight_layout()
         return fig
 
-    def plot_asset_weight_evolution(self, title: str = "Asset Weight Evolution") -> plt.Figure:
-        """Plot the evolution of asset weights in the portfolio over time.
+    def plot_asset_weight_evolution(self, title: str = "Portfolio Weights by Simulation") -> plt.Figure:
+        """Plot asset weights for each simulation as a stacked column chart.
 
         Args:
-            title (str, optional): Plot title. Defaults to "Asset Weight Evolution".
+            title (str, optional): Plot title. Defaults to "Portfolio Weights by Simulation".
 
         Returns:
-            plt.Figure: Matplotlib figure object.
+            plt.Figure: Matplotlib figure object showing stacked column chart of
+                       asset weights for each simulation.
         """
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(15, 7))
         sns.set_style("whitegrid")
 
-        # Compute average weights by date and asset
-        avg_weights = (
-            self.simulations.groupby(["Date", "Asset"])["Weight"].mean().unstack()
-        )
+        pivot_df = self.simulations.pivot_table(index="Simulation", columns="Asset", values="Weight", aggfunc="sum")
+        pivot_df.plot.area(alpha=0.8)
 
-        # Plot stacked area chart
-        avg_weights.plot(kind="area", stacked=True, ax=ax)
-        ax.set_title(title)
-        ax.set_xlabel("Date")
+        # Customize plot
+        ax.set_title(title, pad=20)
+        ax.set_xlabel("Simulation Number")
         ax.set_ylabel("Portfolio Weight")
-        ax.legend(title="Assets", bbox_to_anchor=(1.05, 1), loc="upper left")
+        ax.legend(
+            title="Assets",
+            bbox_to_anchor=(1.05, 1),
+            loc="upper left",
+            borderaxespad=0
+        )
+        
+        # Reduce number of x-axis labels
+        total_sims = pivot_df.shape[0]
+        step = max(1, total_sims // 10)  # Show about 10 labels
+        ax.set_xticks(range(0, total_sims, step))
+        ax.set_xticklabels(range(0, total_sims, step))
+        plt.xticks(rotation=0)  # Horizontal labels
+        
+        ax.margins(x=0)
         fig.tight_layout()
         return fig
 

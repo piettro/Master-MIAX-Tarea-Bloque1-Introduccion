@@ -1,26 +1,22 @@
 """
-Monte Carlo Simulation Framework with Pluggable Distribution Strategies
+Monte Carlo Simulation Framework
 
 This module implements a flexible Monte Carlo simulation framework using
 multiple design patterns to ensure extensibility and maintainability.
 
 Design Patterns:
-    - Strategy: Pluggable distribution generators
     - Template Method: Standardized simulation workflow
     - Factory Method: Simulation component creation
     - Observer: Simulation monitoring and results collection
     - Chain of Responsibility: Simulation pipeline
-    - Bridge: Distribution strategy implementation
 
 Key Features:
-    - Flexible distribution strategies
     - Configurable simulation parameters
     - Statistical analysis tools
     - Result visualization
     - Risk metrics calculation
 
 Technical Components:
-    - Distribution Strategy: Return generation
     - Portfolio Analysis: Performance metrics
     - Risk Assessment: VaR and other metrics
     - Results Management: Data organization
@@ -31,7 +27,6 @@ from typing import Optional, Any
 import numpy as np
 import pandas as pd
 from src.core.entities.portfolio import Portfolio
-from src.analysis.entities.distribuition_generator import *
 
 class MonteCarloBase(ABC):
     """
@@ -41,14 +36,11 @@ class MonteCarloBase(ABC):
     and extensible framework for Monte Carlo simulations.
     
     Design Pattern Implementation:
-        - Strategy: Pluggable distribution generators
         - Template Method: Simulation workflow
         - Observer: Results monitoring
-        - Bridge: Distribution implementation
         
     Key Features:
         - Configurable simulation parameters
-        - Flexible distribution strategies
         - Risk metric calculations
         - Result management
         
@@ -65,7 +57,6 @@ class MonteCarloBase(ABC):
         n_simulations: int = 1000,
         risk_free_rate: float = 0.0,
         alpha: float = 0.05,
-        distribution: Optional[DistributionBase] = None,
         seed: Optional[int] = None,
     ):
         """
@@ -81,14 +72,11 @@ class MonteCarloBase(ABC):
             Risk-free rate for performance metrics
         alpha : float, default=0.05
             Significance level for risk metrics
-        distribution : DistributionBase, optional
-            Return distribution strategy
         seed : int, optional
             Random seed for reproducibility
             
         Design Notes
         -----------
-        - Uses Strategy pattern for distribution
         - Implements Observer for results
         - Supports Chain of Responsibility
         
@@ -103,19 +91,31 @@ class MonteCarloBase(ABC):
         - simulations: Detailed paths
         """
         self.portfolio = portfolio
-        self.returns_df = self.portfolio.series.get_returns()
         self.n_simulations = n_simulations
         self.risk_free_rate = risk_free_rate
         self.alpha = alpha
+
+        self.initial_capital = portfolio.total_value_initial()
         self.results: Optional[pd.DataFrame] = None
         self.simulations: Optional[pd.DataFrame] = None
-
-        # Initialize distribution strategy
-        self.distribution = distribution or NormalDistribution()
+        self.returns_df = self.portfolio.series.get_returns()
+        self.historical_returns = self.portfolio.series.get_returns()
+        self.assets = self.historical_returns.columns
+        self.weights = np.array(list(self.portfolio.weights().values()))
+        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])    
 
         # Set random seed if provided
         if seed is not None:
             np.random.seed(seed)
+
+        if n_simulations <= 0:
+            raise ValueError(f"Number of simulations must be positive, got {n_simulations}")
+            
+        if not 0 <= alpha <= 1:
+            raise ValueError(f"Alpha must be between 0 and 1, got {alpha}")
+            
+        if risk_free_rate < -1:
+            raise ValueError(f"Risk-free rate cannot be less than -100%, got {risk_free_rate}")
 
     @abstractmethod
     def run(self) -> Any:
@@ -127,7 +127,6 @@ class MonteCarloBase(ABC):
         
         Design Pattern Implementation:
             - Template Method: Simulation workflow
-            - Strategy: Distribution usage
             - Observer: Progress monitoring
             - Chain of Responsibility: Processing pipeline
             
@@ -146,8 +145,47 @@ class MonteCarloBase(ABC):
         Notes
         -----
         - Must be implemented by concrete classes
-        - Should use configured distribution strategy
         - Must handle all simulation parameters
         - Should provide comprehensive results
         """
         pass
+
+    def generate_weights(self) -> np.ndarray:
+        """Generate a vector of portfolio weights that sum to 1.
+
+        Returns:
+            np.ndarray: Array of weights (length = number of assets).
+        """
+        
+        w = np.abs(np.random.randn(self.assets.shape[0]))
+        weights = w / np.sum(w)
+
+        return weights
+
+    def generate_simulated_returns(self, n_periods: int) -> np.ndarray:
+        """Generate multivariate simulated log returns.
+
+        Args:
+            n_periods (int): Number of periods to simulate.
+
+        Returns:
+            np.ndarray: Matrix of simulated returns.
+        """
+        means = self.historical_returns.mean()
+        cov = self.historical_returns.cov()
+
+        simulated_log_returns = np.random.multivariate_normal(mean=means, cov=cov, size=n_periods)
+        return np.exp(simulated_log_returns) - 1
+
+    def get_weights(self) -> pd.DataFrame:
+        """Get the current portfolio weights as a DataFrame.
+        
+        Returns:
+            pd.DataFrame: DataFrame containing:
+                - symbol: Asset symbols/names
+                - weight: Portfolio weights for each asset
+        """
+        return pd.DataFrame({
+            'symbol': self.assets,
+            'weight': self.weights
+        })

@@ -19,9 +19,7 @@ class MonteCarloCombined(MonteCarloBase):
         portfolio,
         n_simulations: int = 1000,
         risk_free_rate: float = 0.0,
-        initial_capital: float = 10000.0,
         seed: int = None,
-        weight_method: str = "dirichlet",
     ) -> None:
         """Initialize MonteCarloCombined.
 
@@ -41,41 +39,6 @@ class MonteCarloCombined(MonteCarloBase):
             seed=seed,
         )
 
-        self.initial_capital = initial_capital
-        self.weight_method = weight_method
-        self.historical_returns = self.portfolio.series.get_returns()
-        self.assets = self.historical_returns.columns
-        self.n_assets = len(self.assets)
-        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])
-
-    def _generate_weights(self) -> np.ndarray:
-        """Generate a vector of portfolio weights that sum to 1.
-
-        Returns:
-            np.ndarray: Array of weights (length = number of assets).
-        """
-        if self.weight_method == "dirichlet":
-            weights = np.random.dirichlet(np.ones(self.n_assets))
-        else:
-            w = np.abs(np.random.randn(self.n_assets))
-            weights = w / np.sum(w)
-        return weights
-
-    def _generate_simulated_returns(self, n_periods: int) -> np.ndarray:
-        """Generate multivariate simulated log returns.
-
-        Args:
-            n_periods (int): Number of periods to simulate.
-
-        Returns:
-            np.ndarray: Matrix of simulated returns.
-        """
-        means = self.historical_returns.mean()
-        cov = self.historical_returns.cov()
-
-        simulated_log_returns = np.random.multivariate_normal(mean=means, cov=cov, size=n_periods)
-        return np.exp(simulated_log_returns) - 1
-
     def run(self) -> pd.DataFrame:
         """Run combined Monte Carlo simulations varying both weights and returns.
 
@@ -93,10 +56,10 @@ class MonteCarloCombined(MonteCarloBase):
 
         for sim in range(self.n_simulations):
             # 1. Generate stochastic weights
-            weights = self._generate_weights()
+            weights = self.generate_weights()
 
             # 2. Generate simulated log returns
-            simulated_returns = self._generate_simulated_returns(len(self.historical_returns))
+            simulated_returns = self.generate_simulated_returns(len(self.historical_returns))
 
             # 3. Build DataFrame of simulated returns
             df_returns = pd.DataFrame(

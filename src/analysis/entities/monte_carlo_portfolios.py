@@ -22,8 +22,6 @@ class MonteCarloPortfolio(MonteCarloBase):
         portfolio,
         n_simulations: int = 1000,
         risk_free_rate: float = 0.0,
-        initial_capital: float = 10000.0,
-        weight_method: str = "dirichlet",
         seed: Optional[int] = None,
     ):
         """
@@ -51,13 +49,6 @@ class MonteCarloPortfolio(MonteCarloBase):
             seed=seed,
         )
 
-        self.initial_capital = initial_capital
-        self.weight_method = weight_method
-        self.historical_returns = self.portfolio.series.get_returns()
-        self.assets = self.historical_returns.columns
-        self.n_assets = len(self.assets)
-        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])
-
     def run(self) -> pd.DataFrame:
         """
         Runs the Monte Carlo simulation by varying only portfolio weights,
@@ -77,7 +68,7 @@ class MonteCarloPortfolio(MonteCarloBase):
 
         for sim in range(self.n_simulations):
             # 1. Generate random weights
-            weights = self._generate_weights()
+            weights = self.generate_weights()
 
             # 2. Copy historical returns
             returns_df = self.historical_returns.copy()
@@ -117,17 +108,3 @@ class MonteCarloPortfolio(MonteCarloBase):
         )
 
         return self.simulations
-
-    def _generate_weights(self) -> np.ndarray:
-        """
-        Generates random portfolio weights that sum to 1.
-
-        Returns:
-            np.ndarray: Vector of normalized portfolio weights.
-        """
-        if self.weight_method == "dirichlet":
-            weights = np.random.dirichlet(np.ones(self.n_assets))
-        else:
-            random_values = np.abs(np.random.randn(self.n_assets))
-            weights = random_values / np.sum(random_values)
-        return weights

@@ -119,7 +119,7 @@ def main():
 
         # Initialize Monte Carlo simulation using Strategy pattern
         monte_carlo_portfolio = MonteCarloPortfolio(
-            portfolio=portfolio  # Target portfolio for analysis
+            portfolio=portfolio 
         )
 
         # Execute simulation using Template Method pattern
@@ -130,6 +130,7 @@ def main():
             simulation=monte_carlo_portfolio,
             title="Monte Carlo Simulation Report - Quickstart Portfolio"
         )
+        
         # Generate comprehensive report using Chain of Responsibility
         report.generate()
 

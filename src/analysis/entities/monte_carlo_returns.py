@@ -19,9 +19,8 @@ class MonteCarloReturn(MonteCarloBase):
     def __init__(
         self,
         portfolio,
-        n_simulations: int = 10,
+        n_simulations: int = 1000,
         risk_free_rate: float = 0.0,
-        initial_capital: float = 10000.0,
         seed: Optional[int] = None,
     ):
         """
@@ -46,13 +45,6 @@ class MonteCarloReturn(MonteCarloBase):
             seed=seed,
         )
 
-        self.initial_capital = initial_capital
-        self.historical_returns = self.portfolio.series.get_returns()
-        self.assets = self.historical_returns.columns
-        self.n_assets = len(self.assets)
-        self.weights = np.array(list(self.portfolio.weights().values()))
-        self.simulations: pd.DataFrame = pd.DataFrame(columns=["Return", "Value", "Simulation"])
-
     def run(self) -> pd.DataFrame:
         """
         Runs the Monte Carlo simulation by varying log-based asset returns,
@@ -74,10 +66,7 @@ class MonteCarloReturn(MonteCarloBase):
 
         for sim in range(self.n_simulations):
             # Generate simulated log returns
-            simulated_log_returns = np.random.multivariate_normal(
-                mean=means, cov=cov, size=len(self.historical_returns)
-            )
-            simulated_returns = np.exp(simulated_log_returns) - 1
+            simulated_returns = self.generate_simulated_returns(len(self.historical_returns))
 
             # Create DataFrame of simulated returns
             returns_df = pd.DataFrame(

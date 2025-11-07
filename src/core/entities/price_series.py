@@ -61,7 +61,6 @@ class PriceSeries(TimeSeries):
         if isinstance(self.symbols, str):
             self.symbols = self.symbols.replace(",", " ").split()
 
-        # Strategy pattern: Use extractor to fetch data
         extractor = MarketDataExtractor()
         self.data = extractor.fetch_price_series(
             symbols=self.symbols,
@@ -70,8 +69,7 @@ class PriceSeries(TimeSeries):
             source=self.source,
             interval=self.interval
         )
-
-        # Observer pattern: Compute initial statistics
+        
         self._compute_stats()
 
     def _compute_stats(self):
@@ -137,6 +135,27 @@ class PriceSeries(TimeSeries):
         try:
             close_prices = self.data.xs('Close', axis=1, level=0)
             return close_prices.iloc[-1]
+        except KeyError:
+            return pd.Series(dtype=float)
+
+    def get_initial_prices(self) -> pd.Series:
+        """
+        Retrieve initial market prices for all tracked symbols.
+        
+        This method implements the Strategy pattern for accessing price data,
+        handling multi-index data structures with error protection.
+
+        Returns
+        -------
+        pd.Series
+            Initial closing prices for each symbol, indexed by symbol name
+        """
+        if self.data.empty:
+            return pd.Series(dtype=float)
+
+        try:
+            close_prices = self.data.xs('Close', axis=1, level=0)
+            return close_prices.iloc[0]
         except KeyError:
             return pd.Series(dtype=float)
 

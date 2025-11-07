@@ -23,21 +23,20 @@ Este proyecto forma parte del Máster en Inteligencia Artificial y Finanzas Cuan
 │   ├── quickstart_monte_carlo.py
 │   └── quickstart_macro.py
 │
-├── src/                  # Código fuente
-│   ├── analysis/         # Módulos de análisis
-│   │   └── entities/     # Entidades de análisis Monte Carlo
-│   │
-│   ├── core/            # Entidades principales
-│   │   └── entities/    # Series temporales y carteras
-│   │
-│   ├── extractor/       # Extractores de datos
-│   │   └── sources/     # Fuentes de datos (Yahoo, Alpha Vantage, etc.)
-│   │
-│   ├── plots/           # Visualizaciones
-│   │
-│   └── reports/         # Generación de informes
-│
-└── tests/               # Tests unitarios
+└── src/                  # Código fuente
+    ├── analysis/         # Módulos de análisis
+    │   └── entities/     # Entidades de análisis Monte Carlo
+    │
+    ├── core/            # Entidades principales
+    │   └── entities/    # Series temporales y carteras
+    │
+    ├── extractor/       # Extractores de datos
+    │   └── sources/     # Fuentes de datos (Yahoo, Alpha Vantage, etc.)
+    │
+    ├── plots/           # Visualizaciones
+    │
+    └── reports/         # Generación de informes
+
 ```
 
 ### 🔧 Patrones de Diseño Implementados

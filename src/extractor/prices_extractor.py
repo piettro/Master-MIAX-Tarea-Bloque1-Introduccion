@@ -152,7 +152,42 @@ class MarketDataExtractor:
             end_date=end_date,
             interval=interval.value
         )
-               
+
+        # Validate DataFrame structure
+        if not isinstance(data.columns, pd.MultiIndex):
+            raise ValueError("Data must have a MultiIndex with (Price, Ticker) levels")
+            
+        if len(data.columns.levels) != 2:
+            raise ValueError("MultiIndex must have exactly 2 levels: Price and Ticker")
+            
+        # Validate required price types
+        required_columns = {'Open', 'High', 'Low', 'Close', 'Volume'}
+        price_types = set(data.columns.get_level_values(0).unique())
+        missing = required_columns - price_types
+        if missing:
+            raise ValueError(f"Missing required price types: {missing}")
+            
+        # Validate data types for each ticker
+        for ticker in data.columns.get_level_values(1).unique():
+            # Validate numeric columns for each price type
+            for price_type in required_columns:
+                if not pd.api.types.is_numeric_dtype(data[price_type, ticker]):
+                    raise TypeError(f"{price_type} must be numeric type for ticker {ticker}")
+                    
+            # Validate price consistency for each ticker
+            ticker_data = data.xs(ticker, axis=1, level=1)
+            invalid_prices = ticker_data[
+                (ticker_data['High'] < ticker_data['Low']) |
+                (ticker_data['Close'] < ticker_data['Low']) |
+                (ticker_data['Close'] > ticker_data['High']) |
+                (ticker_data['Open'] < ticker_data['Low']) |
+                (ticker_data['Open'] > ticker_data['High'])
+            ]
+            
+            if not invalid_prices.empty:
+                f"Invalid price relationships found for {ticker} at dates: "
+                f"{invalid_prices.index.strftime('%Y-%m-%d').tolist()}"
+                  
         return data
         
     def compute_data_statistics(self, data: pd.DataFrame) -> Dict[str, pd.DataFrame]:

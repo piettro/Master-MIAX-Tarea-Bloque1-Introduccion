@@ -105,8 +105,10 @@ class MonteCarloReport(BaseReport):
             f"- **Name:** {portfolio.name}",
             "- **Assets:**",
         ]
-        for asset, weight in portfolio.weights().items():
-            portfolio_info.append(f"  - {asset}: {weight:.2%}")
+
+        for asset in self.simulation.assets:
+            portfolio_info.append(f"  - {asset}")
+        
         portfolio_info.extend(
             [
                 f"- **Period:** {portfolio.start_date} to {portfolio.end_date}",
@@ -181,7 +183,7 @@ class MonteCarloReport(BaseReport):
         try:
             plt.figure(figsize=(12, 6))
             self.visualizer.plot_asset_weight_evolution()
-            self.add_plot(plt.gcf(), "Weights Evolution")
+            self.add_plot(plt.gcf(), "Weights Distribution")
             plt.close()
         except Exception:
             # Some simulation types may not include dynamic weights

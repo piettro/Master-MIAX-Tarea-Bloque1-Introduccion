@@ -91,7 +91,8 @@ def main():
             'JPM',    # Financial
             'MRK',    # Healthcare
             'XOM',    # Energy
-            'WMT'     # Consumer
+            'WMT',    # Consumer
+            '^GSPC'   # S&P 500 Index   
         ]
         
         # Configure analysis parameters using Strategy pattern
