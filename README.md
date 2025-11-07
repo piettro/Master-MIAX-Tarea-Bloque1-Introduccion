@@ -49,6 +49,12 @@ Este proyecto forma parte del Máster en Inteligencia Artificial y Finanzas Cuan
 - **Builder Pattern**: Construcción de simulaciones
 - **Bridge Pattern**: Abstracción de visualizaciones
 
+### 📐 Documentación de Arquitectura
+
+Para una visión detallada de la arquitectura del sistema, consulte:
+- [📋 Documentación de Arquitectura](docs/architecture.md)
+- [🎨 Diagramas del Sistema](docs/diagrams.md)
+
 ---
 
 ## 🚀 Características Principales
