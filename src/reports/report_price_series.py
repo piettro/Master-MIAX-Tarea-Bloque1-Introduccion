@@ -25,7 +25,6 @@ class PriceSeriesReport(BaseReport):
         self,
         price_series: PriceSeries,
         titulo: str = "Relatório de Análise de Série Temporal",
-        output_dir: Optional[Path] = None,
         include_plots: bool = True,
         include_tables: bool = True,
         moving_averages: Optional[List[int]] = [20, 50, 200]
@@ -37,8 +36,6 @@ class PriceSeriesReport(BaseReport):
             Objeto PriceSeries com os dados do ativo
         titulo : str
             Título do relatório
-        output_dir : Path, opcional
-            Diretório para salvar o relatório
         include_plots : bool
             Se True, inclui visualizações
         include_tables : bool
@@ -48,7 +45,6 @@ class PriceSeriesReport(BaseReport):
         """
         super().__init__(
             titulo=titulo,
-            output_dir=output_dir,
             include_plots=include_plots,
             include_tables=include_tables
         )
@@ -70,88 +66,101 @@ class PriceSeriesReport(BaseReport):
                 f"PriceSeries deve conter as colunas: {', '.join(self.required_columns)}"
             )
         
-        # Obtém lista de tickers
-        self.tickers = price_series.tickers if isinstance(price_series.tickers, list) else [price_series.tickers]
-        
-        # Dicionário para armazenar dados e visualizadores por ticker
-        self.ticker_data = {}
+        self.symbols = price_series.symbols if isinstance(price_series.symbols, list) else [price_series.symbols]
+        self.symbol_data = {}
         self.visualizadores = {}
         
-    def generate(self) -> str:
+    def generate(self) -> List[Path]:
         """
-        Gera o conteúdo do relatório de série temporal para cada ticker.
+        Gera relatórios individuais para cada symbol e um relatório consolidado.
         
         Returns
         -------
-        str
-            Conteúdo do relatório em formato Markdown
+        List[Path]
+            Lista com os caminhos de todos os relatórios gerados
         """
-        relatorios_gerados = []
+        saved_reports = []
+        all_sections = []  # Para o relatório consolidado
         
-        for ticker in self.tickers:
-            print(f"\nGerando relatório para {ticker}...")
+        for symbol in self.symbols:
+            print(f"\nGerando relatório para {symbol}...")
             
-            # Prepara dados do ticker atual
-            self._prepare_ticker_data(ticker)
+            # Limpa as seções anteriores para o relatório individual
+            self.sections = []
             
-            # Adiciona cabeçalho do ticker
-            self.add_section(f"Relatório: {ticker}", level=1)
+            # Prepara dados do symbol atual
+            self._prepare_symbol_data(symbol)
+            
+            # Adiciona cabeçalho do symbol
+            self.add_section(f"Relatório: {symbol}", level=1)
             
             # Informações Básicas
-            self._add_info_section(ticker)
+            self._add_info_section(symbol)
             
             # Análise Técnica
             if self.include_plots:
-                self._add_technical_analysis(ticker)
+                self._add_technical_analysis(symbol)
             
             # Análise Estatística
             if self.include_tables:
-                self._add_statistical_analysis(ticker)
+                self._add_statistical_analysis(symbol)
             
             # Análise de Retornos
-            self._add_returns_analysis(ticker)
+            self._add_returns_analysis(symbol)
             
             # Análise de Risco
-            self._add_risk_analysis(ticker)
+            self._add_risk_analysis(symbol)
             
-            relatorios_gerados.append(ticker)
+            # Salva relatório individual
+            individual_path = self.save(symbols=[symbol])
+            saved_reports.append(individual_path)
             
-            # Adiciona separador entre relatórios
-            if ticker != self.tickers[-1]:
-                self.add_section("---", level=0)
+            # Guarda as seções para o relatório consolidado
+            all_sections.extend(self.sections)
+            if symbol != self.symbols[-1]:
+                all_sections.append({'title': '', 'content': '---\n', 'level': 0})
         
-        return f"Relatórios gerados com sucesso para: {', '.join(relatorios_gerados)}"
-    
-    #Bem feito
-    def _prepare_ticker_data(self, ticker: str) -> None:
+        # Gera relatório consolidado
+        self.sections = all_sections
+        consolidated_path = self.save(symbols=self.symbols)
+        saved_reports.append(consolidated_path)
+        
+        print(f"\nRelatórios gerados com sucesso:")
+        print(f"- Relatórios individuais: {len(self.symbols)}")
+        print(f"- Relatório consolidado: 1")
+        print(f"Total de relatórios: {len(saved_reports)}")
+        
+        return saved_reports
+        
+    def _prepare_symbol_data(self, symbol: str) -> None:
         """
-        Prepara os dados para um ticker específico.
+        Prepara os dados para um symbol específico.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
-        # Se já temos os dados deste ticker, não precisamos processar novamente
-        if ticker in self.ticker_data:
+        # Se já temos os dados deste symbol, não precisamos processar novamente
+        if symbol in self.symbol_data:
             return
             
-        # Obtém os dados do ticker
-        ticker_df = pd.DataFrame()
+        # Obtém os dados do symbol
+        symbol_df = pd.DataFrame()
         for col in self.required_columns:
-            ticker_df[col] = self.data[col, ticker]
+            symbol_df[col] = self.data[col, symbol]
 
         # Armazena os dados e cria visualizador
-        self.ticker_data[ticker] = ticker_df
-        self.visualizadores[ticker] = VisualizadorPriceSeries(ticker_df)
+        self.symbol_data[symbol] = symbol_df
+        self.visualizadores[symbol] = VisualizadorPriceSeries(symbol_df)
         
-    def _add_info_section(self, ticker: str) -> None:
+    def _add_info_section(self, symbol: str) -> None:
         """
         Adiciona seção com informações básicas do ativo.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
         self.add_section(
@@ -159,36 +168,34 @@ class PriceSeriesReport(BaseReport):
             level=2
         )
         
-        # Obtém informações do ticker atual
-        df = self.ticker_data[ticker]
+        # Obtém informações do symbol atual
+        df = self.symbol_data[symbol]
         primeiro_preco = df['Close'].iloc[0]
         ultimo_preco = df['Close'].iloc[-1]
         
         info = [
-            f"- **Ativo:** {ticker}",
+            f"- **Ativo:** {symbol}",
             f"- **Período:** {self.price_series.start_date} a {self.price_series.end_date}",
-            f"- **Número de Observações:** {len(self.ticker_data)}",
+            f"- **Número de Observações:** {len(self.symbol_data)}",
             f"- **Primeiro Preço:** {primeiro_preco:.2f}",
             f"- **Último Preço:** {ultimo_preco:.2f}",
             f"- **Variação Total:** {((ultimo_preco / primeiro_preco) - 1):.2%}"
         ]
         
         self.add_section("", "\n".join(info))
-
-        print('estou aqui agor')
         
-    def _add_technical_analysis(self, ticker: str) -> None:
+    def _add_technical_analysis(self, symbol: str) -> None:
         """
         Adiciona seção com análise técnica.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
         self.add_section("Análise Técnica", level=2)
         
-        visualizador = self.visualizadores[ticker]
+        visualizador = self.visualizadores[symbol]
         
         # Preços e Médias Móveis
         fig = visualizador.plot_precos(window_ma=self.moving_averages)
@@ -217,17 +224,17 @@ class PriceSeriesReport(BaseReport):
         )
         plt.close()
         
-    def _add_statistical_analysis(self, ticker: str) -> None:
+    def _add_statistical_analysis(self, symbol: str) -> None:
         """
         Adiciona seção com análise estatística.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
         self.add_section("Análise Estatística", level=2)
-        df = self.ticker_data[ticker]
+        df = self.symbol_data[symbol]
         
         # Estatísticas básicas dos preços
         stats = pd.DataFrame({
@@ -240,7 +247,7 @@ class PriceSeriesReport(BaseReport):
                 'Assimetria',
                 'Curtose'
             ],
-            'Preço': [
+            'Close': [
                 df['Close'].mean(),
                 df['Close'].median(),
                 df['Close'].std(),
@@ -272,20 +279,20 @@ class PriceSeriesReport(BaseReport):
             format_dict=format_dict
         )
         
-    def _add_returns_analysis(self, ticker: str) -> None:
+    def _add_returns_analysis(self, symbol: str) -> None:
         """
         Adiciona seção com análise de retornos.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
         self.add_section("Análise de Retornos", level=2)
         
         # Distribuição dos retornos
         if self.include_plots:
-            fig = self.visualizadores[ticker].plot_retornos(tipo='log')
+            fig = self.visualizadores[symbol].plot_retornos(tipo='log')
             self.add_plot(
                 fig,
                 "Distribuição dos Retornos",
@@ -296,7 +303,7 @@ class PriceSeriesReport(BaseReport):
         # Estatísticas dos retornos
         if self.include_tables:
             # Calcula retornos logarítmicos
-            df = self.ticker_data[ticker]
+            df = self.symbol_data[symbol]
             returns = np.log(df['Close'] / df['Close'].shift(1))
             
             stats = pd.DataFrame({
@@ -333,18 +340,18 @@ class PriceSeriesReport(BaseReport):
                 format_dict=format_dict
             )
             
-    def _add_risk_analysis(self, ticker: str) -> None:
+    def _add_risk_analysis(self, symbol: str) -> None:
         """
         Adiciona seção com análise de risco.
         
         Parameters
         ----------
-        ticker : str
+        symbol : str
             Símbolo do ativo
         """
         self.add_section("Análise de Risco", level=2)
         
-        visualizador = self.visualizadores[ticker]
+        visualizador = self.visualizadores[symbol]
         
         if self.include_plots:
             # Volatilidade

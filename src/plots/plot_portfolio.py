@@ -77,15 +77,10 @@ class VisualizadorPortfolio:
         
         return fig
         
-    def plot_evolucao_portfolio(self, baseline: Optional[pd.Series] = None) -> plt.Figure:
+    def plot_evolucao_portfolio(self) -> plt.Figure:
         """
         Gera gráfico de evolução do valor do portfolio.
         
-        Parameters
-        ----------
-        baseline : pd.Series, opcional
-            Série com um benchmark para comparação
-            
         Returns
         -------
         plt.Figure
@@ -97,11 +92,6 @@ class VisualizadorPortfolio:
         portfolio_value = (1 + self.portfolio_returns).cumprod()
         ax.plot(portfolio_value.index, portfolio_value['Portfolio'],
                 label='Portfolio', linewidth=2)
-        
-        if baseline is not None:
-            baseline_value = (1 + baseline).cumprod()
-            ax.plot(baseline_value.index, baseline_value,
-                   label='Benchmark', linewidth=2, alpha=0.7)
         
         ax.set_title('Evolução do Portfolio')
         ax.set_xlabel('Data')
@@ -307,15 +297,10 @@ class VisualizadorPortfolio:
         
         return fig
         
-    def plot_dashboard(self, baseline: Optional[pd.Series] = None) -> plt.Figure:
+    def plot_dashboard(self) -> plt.Figure:
         """
         Gera um dashboard completo com principais gráficos.
         
-        Parameters
-        ----------
-        baseline : pd.Series, opcional
-            Série com um benchmark para comparação
-            
         Returns
         -------
         plt.Figure
@@ -329,10 +314,6 @@ class VisualizadorPortfolio:
         portfolio_value = (1 + self.portfolio_returns).cumprod()
         ax1.plot(portfolio_value.index, portfolio_value['Portfolio'],
                 label='Portfolio', linewidth=2)
-        if baseline is not None:
-            baseline_value = (1 + baseline).cumprod()
-            ax1.plot(baseline_value.index, baseline_value,
-                    label='Benchmark', linewidth=2, alpha=0.7)
         ax1.set_title('Evolução do Portfolio')
         ax1.legend()
         ax1.grid(True, alpha=0.3)

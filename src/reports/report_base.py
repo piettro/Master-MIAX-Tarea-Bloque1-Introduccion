@@ -8,7 +8,7 @@ import base64
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -21,9 +21,8 @@ class BaseReport(ABC):
     def __init__(
         self,
         titulo: str,
-        output_dir: Optional[Path] = None,
         include_plots: bool = True,
-        include_tables: bool = True
+        include_tables: bool = True,
     ):
         """
         Inicializa um novo relatório.
@@ -32,21 +31,18 @@ class BaseReport(ABC):
         ----------
         titulo : str
             Título do relatório
-        output_dir : Path, opcional
-            Diretório para salvar o relatório. Se None, usa o diretório atual
         include_plots : bool
             Se True, inclui visualizações no relatório
         include_tables : bool
             Se True, inclui tabelas de dados no relatório
         """
         self.titulo = titulo
-        self.output_dir = output_dir or Path.cwd()
         self.include_plots = include_plots
         self.include_tables = include_tables
         self.sections: List[Dict[str, Any]] = []
         
-        # Criar diretórios se não existirem
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Setup do diretório de saída com estrutura organizada
+        self._setup_output_directory()
         
     def add_section(
         self,
@@ -160,48 +156,88 @@ class BaseReport(ABC):
         })
         
     @abstractmethod
-    def generate(self) -> str:
+    def generate(self, auto_save: bool = True) -> Union[str, Path]:
         """
-        Gera o conteúdo do relatório.
+        Gera o conteúdo do relatório e opcionalmente salva em arquivo.
         Deve ser implementado pelas classes filhas.
-        
-        Returns
-        -------
-        str
-            Conteúdo do relatório em formato Markdown
-        """
-        pass
-        
-    def save(self, filename: str) -> Path:
-        """
-        Salva o relatório em um arquivo.
         
         Parameters
         ----------
-        filename : str
-            Nome do arquivo (sem extensão)
+        auto_save : bool, opcional
+            Se True, salva automaticamente o relatório após gerar (default: True)
+            
+        Returns
+        -------
+        Union[str, Path]
+            Se auto_save=True: Path do arquivo salvo
+            Se auto_save=False: Conteúdo do relatório em formato Markdown
+        """
+        pass
+        
+    def _setup_output_directory(self) -> None:
+        """
+        Configura a estrutura de diretórios para salvar os relatórios.
+        Estrutura: base_dir/data/reports/tipo_report/YYYY-MM-DD/
+        """
+        # Diretório base (raiz do projeto)
+        self.base_dir = Path(__file__).resolve().parent.parent.parent
+        
+        # Data atual para organização
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Define o tipo de relatório com base no nome da classe
+        report_type = self.__class__.__name__.lower().replace('report', '')
+        
+        # Criar estrutura de diretórios
+        self.output_dir = self.base_dir / "data" / "reports" / report_type / today
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Diretório de saída configurado: {self.output_dir}")
+
+    def save(self, symbols: Optional[List[str]] = None, custom_name: Optional[str] = None) -> Path:
+        """
+        Salva o relatório em arquivo markdown na estrutura de diretórios apropriada.
+        
+        Parameters
+        ----------
+        symbols : List[str], opcional
+            Lista de símbolos para organização em subpastas
+        custom_name : str, opcional
+            Nome customizado para o arquivo (sem extensão)
             
         Returns
         -------
         Path
             Caminho do arquivo salvo
         """
-        # Gerar relatório
-        content = self.generate()
-        
-        # Adicionar metadados
-        self.add_metadata()
-        
-        # Juntar todas as seções
-        full_report = []
-        for section in self.sections:
-            if section['level'] > 0:
-                full_report.append(f"{'#' * section['level']} {section['title']}")
-            if section['content']:
-                full_report.append(section['content'])
-            full_report.append("")
+        try:
+            if custom_name:
+                filename = custom_name
+            elif symbols:
+                symbol_part = "_".join(sorted(symbols)[:5])
+                if len(symbols) > 5:
+                    symbol_part += "_etc"
+                filename = f"report_{symbol_part}"
+            else:
+                filename = f"report_{datetime.now().strftime('%H%M%S')}"
             
-        # Salvar arquivo
-        output_path = self.output_dir / f"{filename}.md"
-        output_path.write_text("\n".join(full_report), encoding='utf-8')
-        return output_path
+            self.add_metadata()
+            
+            full_report = []
+            for section in self.sections:
+                if section['level'] > 0:
+                    full_report.append(f"{'#' * section['level']} {section['title']}")
+                if section['content']:
+                    full_report.append(section['content'])
+                full_report.append("")
+            
+            output_path = self.output_dir / f"{filename}.md"
+            
+            output_path.write_text("\n".join(full_report), encoding='utf-8')
+            
+            print(f"Relatório salvo em: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            raise ValueError(f"Erro ao salvar relatório: {str(e)}") from e
+        

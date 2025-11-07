@@ -25,10 +25,8 @@ class PortfolioReport(BaseReport):
         self,
         portfolio: Portfolio,
         titulo: str = "Relatório de Análise de Portfolio",
-        output_dir: Optional[Path] = None,
         include_plots: bool = True,
-        include_tables: bool = True,
-        benchmark: Optional[pd.Series] = None
+        include_tables: bool = True
     ):
         """
         Parameters
@@ -43,33 +41,38 @@ class PortfolioReport(BaseReport):
             Se True, inclui visualizações
         include_tables : bool
             Se True, inclui tabelas de métricas
-        benchmark : pd.Series, opcional
-            Série temporal com retornos do benchmark para comparação
         """
         super().__init__(
             titulo=titulo,
-            output_dir=output_dir,
             include_plots=include_plots,
             include_tables=include_tables
         )
         
         self.portfolio = portfolio
-        self.benchmark = benchmark
         
         # Inicializa visualizador
         returns = self.portfolio.returns()
         weights = self.portfolio.weights()
         self.visualizador = VisualizadorPortfolio(returns, weights)
         
-    def generate(self) -> str:
+    def generate(self, auto_save: bool = True) -> Union[str, Path]:
         """
-        Gera o conteúdo do relatório de portfolio.
+        Gera o conteúdo do relatório de portfolio e opcionalmente salva em arquivo.
         
+        Parameters
+        ----------
+        auto_save : bool, opcional
+            Se True, salva automaticamente o relatório após gerar (default: True)
+            
         Returns
         -------
-        str
-            Conteúdo do relatório em formato Markdown
+        Union[str, Path]
+            Se auto_save=True: Path do arquivo salvo
+            Se auto_save=False: Conteúdo do relatório em formato Markdown
         """
+        # Limpa seções anteriores
+        self.sections = []
+        
         # Informações do Portfolio
         self._add_portfolio_info()
         
@@ -91,7 +94,21 @@ class PortfolioReport(BaseReport):
         if self.include_plots:
             self._add_dashboard()
         
-        return "Relatório de Portfolio gerado com sucesso!"
+        if auto_save:
+            # Usa os símbolos do portfolio para o nome do arquivo
+            symbols = list(self.portfolio.holdings)
+            return self.save(symbols=symbols)
+            
+        # Se não for para salvar, junta todas as seções em uma string
+        full_report = []
+        for section in self.sections:
+            if section['level'] > 0:
+                full_report.append(f"{'#' * section['level']} {section['title']}")
+            if section['content']:
+                full_report.append(section['content'])
+            full_report.append("")
+            
+        return "\n".join(full_report)
         
     def _add_portfolio_info(self) -> None:
         """Adiciona seção com informações básicas do portfolio."""
@@ -145,7 +162,7 @@ class PortfolioReport(BaseReport):
         
         if self.include_plots:
             # Evolução do portfolio
-            fig = self.visualizador.plot_evolucao_portfolio(self.benchmark)
+            fig = self.visualizador.plot_evolucao_portfolio()
             self.add_plot(
                 fig,
                 "Evolução do Portfolio",
@@ -190,19 +207,6 @@ class PortfolioReport(BaseReport):
                 ]
             })
             
-            # Adiciona métricas do benchmark se disponível
-            if self.benchmark is not None:
-                stats['Benchmark'] = [
-                    self.benchmark.mean(),
-                    self.benchmark.mean() * 252,
-                    self.benchmark.std(),
-                    self.benchmark.std() * np.sqrt(252),
-                    (self.benchmark.mean() * 252) / (self.benchmark.std() * np.sqrt(252)),
-                    self._calculate_max_drawdown(self.benchmark),
-                    self.benchmark.quantile(0.05),
-                    self.benchmark[self.benchmark <= self.benchmark.quantile(0.05)].mean()
-                ]
-            
             format_dict = {
                 'Valor': lambda x: (
                     f"{x:.2%}" if any(m in stats.loc[stats['Valor'] == x, 'Métrica'].iloc[0] 
@@ -210,8 +214,6 @@ class PortfolioReport(BaseReport):
                     else f"{x:.4f}"
                 )
             }
-            if 'Benchmark' in stats.columns:
-                format_dict['Benchmark'] = format_dict['Valor']
             
             self.add_table(
                 stats,
@@ -256,7 +258,6 @@ class PortfolioReport(BaseReport):
                     'Volatilidade': ret.std() * np.sqrt(252),
                     'Sharpe': (ret.mean() * 252) / (ret.std() * np.sqrt(252)),
                     'VaR 95%': ret.quantile(0.05),
-                    'Beta': self._calculate_beta(ret, self.benchmark) if self.benchmark is not None else None
                 })
                 
             stats_df = pd.DataFrame(stats)
@@ -290,7 +291,7 @@ class PortfolioReport(BaseReport):
         
     def _add_dashboard(self) -> None:
         """Adiciona dashboard completo."""
-        fig = self.visualizador.plot_dashboard(self.benchmark)
+        fig = self.visualizador.plot_dashboard()
         self.add_plot(
             fig,
             "Dashboard Completo",
@@ -306,11 +307,3 @@ class PortfolioReport(BaseReport):
         drawdowns = (cum_returns - rolling_max) / rolling_max
         return drawdowns.min()
         
-    @staticmethod
-    def _calculate_beta(returns: pd.Series, benchmark: pd.Series) -> float:
-        """Calcula o beta de uma série de retornos em relação ao benchmark."""
-        if benchmark is None:
-            return None
-        cov = returns.cov(benchmark)
-        var = benchmark.var()
-        return cov / var if var != 0 else 0

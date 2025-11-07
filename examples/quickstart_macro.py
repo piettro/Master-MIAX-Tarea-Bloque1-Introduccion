@@ -7,9 +7,7 @@ import pandas as pd
 
 from src.core.entities.macro_series import MacroSeries
 from src.extractor.macro_extractor import MacroExtractor
-from src.reports.plot_macro import VisualizadorMacroSeries
 from src.reports.report_macro import MacroReport
-
 
 def main():
     print("\n=== Quickstart: Dados Macroeconômicos ===")
@@ -36,8 +34,7 @@ def main():
         indicators=selected_indicators,
         countries=countries,
         start_date="2000-01-01",
-        end_date=datetime.now().strftime("%Y-%m-%d"),
-        source="worldbank"  
+        end_date=datetime.now().strftime("%Y-%m-%d")
     )
 
     print("\nEstrutura do DataFrame:")
@@ -49,7 +46,6 @@ def main():
     print("\n3. Gerando relatório macroeconômico...")
     report = MacroReport(macro_series=macro)
     report.generate()
-    report.save("data/output/reports/relatorio_macro.md")
 
 if __name__ == "__main__":
     main()

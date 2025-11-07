@@ -6,6 +6,10 @@ from datetime import date, timedelta
 import matplotlib.pyplot as plt
 import seaborn as sns
 from src.core.entities.price_series import PriceSeries
+from src.extractor.sources.prices.extractor_prices_base import (
+    Interval,
+    DataSource
+)
 
 @dataclass
 class Portfolio:
@@ -22,7 +26,8 @@ class Portfolio:
     holdings:Union[str, List[str]]  = field(default_factory=list)
     start_date: date = field(default_factory=lambda: date.today() - timedelta(days=30))
     end_date: date = field(default_factory=date.today)
-    source: Optional[str] = 'yfinance'
+    source: DataSource = field(default_factory=DataSource.YAHOO)
+    interval: Interval = field(default_factory=Interval.DAILY)
 
     #internal attributes
     series:PriceSeries = field(default_factory=dict,init=False)
@@ -49,11 +54,16 @@ class Portfolio:
         # build a price series for the holdings (delegation)
         self.series = PriceSeries(
             name=self.name,
-            tickers=holdings,
+            symbols=holdings,
             start_date=self.start_date,
             end_date=self.end_date,
             source=self.source,
+            interval=self.interval
         )
+
+    def get_prices(self) -> pd.DataFrame:
+        """Return the historical price DataFrame."""
+        return self.series.data
 
     def weights(self) -> Dict[str, float]:
         """Return portfolio weights implied by the provided position sizes."""

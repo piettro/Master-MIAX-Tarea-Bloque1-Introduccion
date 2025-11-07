@@ -3,7 +3,8 @@ Gerador de relatórios em Markdown para simulações Monte Carlo.
 """
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List
+from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 from src.analysis.entities.monte_carlo_returns import MonteCarloRetorno
@@ -24,7 +25,6 @@ class MonteCarloReport(BaseReport):
         self,
         simulacao: Union[MonteCarloRetorno, MonteCarloPortfolio, MonteCarloCombinado],
         titulo: str = "Relatório de Simulação Monte Carlo",
-        output_dir: Optional[Path] = None,
         include_plots: bool = True,
         include_tables: bool = True
     ):
@@ -44,7 +44,6 @@ class MonteCarloReport(BaseReport):
         """
         super().__init__(
             titulo=titulo,
-            output_dir=output_dir,
             include_plots=include_plots,
             include_tables=include_tables
         )
@@ -53,19 +52,27 @@ class MonteCarloReport(BaseReport):
             raise ValueError("A simulação precisa ser executada antes de gerar o relatório")
 
         self.simulacao = simulacao
-        # Calculador e visualizador baseados no DataFrame de simulações
         self.calculador = CalculadorMonteCarlo(simulacao.simulacoes)
         self.visualizador = VisualizadorMonteCarlo(simulacao.simulacoes)
         
-    def generate(self) -> str:
+    def generate(self, auto_save: bool = True) -> Union[str, Path]:
         """
-        Gera o conteúdo do relatório Monte Carlo.
+        Gera o conteúdo do relatório Monte Carlo e opcionalmente salva em arquivo.
         
+        Parameters
+        ----------
+        auto_save : bool, opcional
+            Se True, salva automaticamente o relatório após gerar (default: True)
+            
         Returns
         -------
-        str
-            Conteúdo do relatório em formato Markdown
-        """        
+        Union[str, Path]
+            Se auto_save=True: Path do arquivo salvo
+            Se auto_save=False: Conteúdo do relatório em formato Markdown
+        """
+        # Limpa seções anteriores
+        self.sections = []
+        
         # Informações gerais sobre a simulação e o portfolio
         self._add_simulation_info()
 
@@ -78,10 +85,35 @@ class MonteCarloReport(BaseReport):
         if self.include_plots:
             self._add_visualizations()
 
-        # Conclusões (mantém a lógica original)
+        # Conclusões
         self._add_conclusions()
 
-        return "Relatório Monte Carlo gerado com sucesso!"
+        if auto_save:
+            # Usa os símbolos do portfolio para o nome do arquivo
+            portfolio = self.simulacao.portfolio
+            symbols = list(portfolio.holdings)
+            
+            sim_type = self.simulacao.__class__.__name__.replace('MonteCarlo', '').lower()
+            
+            # Cria o nome do arquivo com o tipo de simulação e os símbolos
+            filename = f"montecarlo_{sim_type}_{datetime.now().strftime('%H%M%S')}"
+            
+            # Salva o relatório com o nome customizado
+            return self.save(
+                symbols=symbols,
+                custom_name=filename
+            )
+            
+        # Se não for para salvar, junta todas as seções em uma string
+        full_report = []
+        for section in self.sections:
+            if section['level'] > 0:
+                full_report.append(f"{'#' * section['level']} {section['title']}")
+            if section['content']:
+                full_report.append(section['content'])
+            full_report.append("")
+            
+        return "\n".join(full_report)
 
     def _add_simulation_info(self) -> None:
         """Adiciona informações básicas sobre a simulação e o portfolio."""

@@ -4,8 +4,9 @@ Gera relatórios completos com visualizações e análises de indicadores.
 """
 
 from pathlib import Path
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 
+from src.core.entities.macro_series import MacroSeries
 from src.reports.report_base import BaseReport
 from src.plots.plot_macro import VisualizadorMacroSeries
 import pandas as pd
@@ -13,16 +14,13 @@ import pandas as pd
 class MacroReport(BaseReport):
     def __init__(
         self,
-        macro_series: Any,  
+        macro_series: MacroSeries,  
         titulo: str = "Relatório de Análise Macroeconômica",
-        output_dir: Optional[Path] = None,
         include_plots: bool = True,
-        include_tables: bool = True,
-        moving_averages: Optional[List[int]] = [12, 24]
+        include_tables: bool = True
     ):
         super().__init__(
             titulo=titulo,
-            output_dir=output_dir,
             include_plots=include_plots,
             include_tables=include_tables
         )
@@ -217,7 +215,24 @@ class MacroReport(BaseReport):
                 level=3
             )
 
-    def generate(self) -> str:
+    def generate(self, auto_save: bool = True) -> Union[str, Path]:
+        """
+        Gera o conteúdo do relatório macroeconômico e opcionalmente salva em arquivo.
+        
+        Parameters
+        ----------
+        auto_save : bool, opcional
+            Se True, salva automaticamente o relatório após gerar (default: True)
+            
+        Returns
+        -------
+        Union[str, Path]
+            Se auto_save=True: Path do arquivo salvo
+            Se auto_save=False: Conteúdo do relatório em formato Markdown
+        """
+        # Limpa seções anteriores
+        self.sections = []
+        
         relatorios_gerados = []
         for indicator in self.indicators:
             try:
@@ -234,4 +249,16 @@ class MacroReport(BaseReport):
                     level=3
                 )
             self.add_section("---", "", level=1)
-        return f"Relatórios gerados com sucesso para: {', '.join(relatorios_gerados)}"
+
+        if auto_save:
+            return self.save(custom_name=self.macro_series.name)
+
+        full_report = []
+        for section in self.sections:
+            if section['level'] > 0:
+                full_report.append(f"{'#' * section['level']} {section['title']}")
+            if section['content']:
+                full_report.append(section['content'])
+            full_report.append("")
+            
+        return "\n".join(full_report)

@@ -10,13 +10,11 @@ class DistribuicaoBase(ABC):
     def gerar_amostras(self, media: np.ndarray, cov: np.ndarray, n_amostras: int) -> np.ndarray:
         pass
 
-
 class DistribuicaoNormal(DistribuicaoBase):
     """Distribuição normal multivariada padrão (Markowitz)."""
 
     def gerar_amostras(self, media, cov, n_amostras):
         return np.random.multivariate_normal(media, cov, n_amostras)
-
 
 class DistribuicaoLogNormal(DistribuicaoBase):
     """Distribuição lognormal (para retornos sempre positivos)."""

@@ -82,26 +82,34 @@ class VisualizadorPriceSeries:
         """
         fig, ax = plt.subplots(figsize=(12, 6))
         
-        # Largura das velas
-        width = np.timedelta64(12, 'h')
+        # Converte o índice para números para plotagem
+        x = np.arange(len(self.data.index))
+        
+        # Largura das velas (ajuste conforme necessário)
+        width = 0.6
         
         # Velas de alta (close > open)
         mask_alta = self.data['Close'] > self.data['Open']
-        ax.bar(self.data[mask_alta].index, 
+        ax.bar(x[mask_alta], 
                self.data[mask_alta]['Close'] - self.data[mask_alta]['Open'],
                bottom=self.data[mask_alta]['Open'],
                width=width, color='g', alpha=0.5)
         
         # Velas de baixa (close < open)
         mask_baixa = self.data['Close'] <= self.data['Open']
-        ax.bar(self.data[mask_baixa].index,
+        ax.bar(x[mask_baixa],
                self.data[mask_baixa]['Close'] - self.data[mask_baixa]['Open'],
                bottom=self.data[mask_baixa]['Open'],
                width=width, color='r', alpha=0.5)
         
         # Sombras
-        ax.vlines(self.data.index, self.data['Low'], self.data['High'],
+        ax.vlines(x, self.data['Low'], self.data['High'],
                  color='black', linewidth=1)
+                 
+        # Configura o eixo x para mostrar as datas
+        ax.set_xticks(x[::len(x)//10])  # Mostra aproximadamente 10 labels
+        ax.set_xticklabels(self.data.index[::len(x)//10].strftime('%Y-%m-%d'),
+                          rotation=45)
         
         ax.set_title('Gráfico de Candlestick')
         ax.set_xlabel('Data')

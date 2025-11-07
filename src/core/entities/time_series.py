@@ -2,6 +2,15 @@ from typing import Dict, List, Union, Optional, Any
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 import pandas as pd
+from src.extractor.sources.prices.extractor_yahoo import YahooExtractor
+from src.extractor.sources.prices.extractor_eodhd import EODHDExtractor
+from src.extractor.sources.prices.extractor_fmp import FMPExtractor
+from src.extractor.sources.prices.extractor_alphavantage import AlphaVantageExtractor
+from src.extractor.sources.prices.extractor_prices_base import (
+    BaseExtractor,
+    Interval,
+    DataSource
+)
 
 @dataclass
 class TimeSeries:
@@ -29,8 +38,6 @@ class TimeSeries:
     data: pd.DataFrame = field(default_factory=pd.DataFrame)
     start_date: date = field(default_factory=lambda: date.today() - timedelta(days=30))
     end_date: date = field(default_factory=date.today)
-    source: Optional[str] = 'yfinance'
-    clean_method: Optional[str] = 'interpolate'
     metadata: Dict[str, Any] = field(default_factory=dict,init=False)
 
     def __post_init__(self):

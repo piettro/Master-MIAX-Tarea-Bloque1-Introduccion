@@ -31,8 +31,7 @@ class MacroExtractor:
         indicators: List[str],
         countries: Optional[List[str]] = None,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        source: str = 'worldbank'
+        end_date: Optional[str] = None
     ) -> pd.DataFrame:
         """
         Busca dados macroeconômicos de uma fonte específica.
@@ -47,9 +46,7 @@ class MacroExtractor:
             Data inicial (YYYY-MM-DD)
         end_date : str, opcional
             Data final (YYYY-MM-DD)
-        source : str
-            Fonte dos dados (apenas 'worldbank' por enquanto)
-            
+
         Returns
         -------
         pd.DataFrame
@@ -60,18 +57,14 @@ class MacroExtractor:
         ValueError
             Se a fonte especificada não estiver disponível
         """
-        if source not in self.AVAILABLE_SOURCES:
-            raise ValueError(
-                f"Fonte inválida. As opções disponíveis são: {self.AVAILABLE_SOURCES}"
-            )
-        
+
         # Define valores padrão
         countries = countries or WorldBankExtractor.DEFAULT_COUNTRIES
         start_date = start_date or "1990-01-01"
         end_date = end_date or datetime.now().strftime("%Y-%m-%d")
         
         # Obtém o extrator e busca os dados
-        extractor = self._extractors[source]
+        extractor = self._extractors['worldbank']
         data = extractor.get_macro_data(
             indicators=indicators,
             countries=countries,
@@ -81,35 +74,15 @@ class MacroExtractor:
         
         return data
     
-    @classmethod
-    def list_available_sources(cls) -> List[str]:
-        """
-        Retorna a lista de fontes de dados disponíveis.
-        
-        Returns
-        -------
-        List[str]
-            Lista com os nomes das fontes disponíveis
-        """
-        return cls.AVAILABLE_SOURCES.copy()
-    
-    def list_available_indicators(self, source: str = 'worldbank') -> dict:
+  
+    def list_available_indicators(self) -> dict:
         """
         Retorna a lista de indicadores disponíveis para uma fonte.
         
-        Parameters
-        ----------
-        source : str
-            Fonte dos dados (apenas 'worldbank' por enquanto)
-            
         Returns
         -------
         dict
             Dicionário com nome e código dos indicadores
         """
-        if source not in self.AVAILABLE_SOURCES:
-            raise ValueError(
-                f"Fonte inválida. As opções disponíveis são: {self.AVAILABLE_SOURCES}"
-            )
             
-        return self._extractors[source].list_available_indicators()
+        return self._extractors['worldbank'].list_available_indicators()

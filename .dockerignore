@@ -10,3 +10,4 @@ notebooks/
 data/raw/*
 data/processed/*
 data/output/*
+data/reports/*

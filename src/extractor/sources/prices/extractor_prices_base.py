@@ -1,42 +1,137 @@
 """
-Base extractor class defining the interface for all data extractors.
-Provides common functionality and standardized methods for data extraction,
-validation, and transformation across different data sources.
+Base extractor class defining the interface for all financial data extractors.
+Implements Template Method pattern for data extraction and processing pipeline.
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Dict, List, Optional, Union
-import logging
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Optional, Union, Tuple
 from pathlib import Path
+import logging
 import pandas as pd
-import numpy as np
+from pathlib import Path
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
-class BaseExtractor(ABC):
-    def __init__(self, cache_data: bool = True):
+class DataSource(Enum):
+    """Available data sources for price extraction"""
+    YAHOO = "yfinance"
+    EODHD = "eodhd"
+    FMP = "fmp"
+    ALPHA_VANTAGE = "alphavantage"
+
+class Interval(Enum):
+    """Supported time intervals for data extraction"""
+    ONE_MINUTE = "1min"
+    TWO_MINUTES = "2min"
+    FIVE_MINUTES = "5min"
+    FIFTEEN_MINUTES = "15min"
+    THIRTY_MINUTES = "30min"
+    SIXTY_MINUTES = "60min"
+    NINETY_MINUTES = "90min"
+    ONE_HOUR = "1h"
+    FOUR_HOURS = "4h"
+    DAILY = "1d"
+    FIVE_DAYS = "5d"
+    WEEKLY = "1wk"
+    MONTHLY = "1mo"
+    QUARTERLY = "3mo"
+    
+    @classmethod
+    def from_string(cls, interval: str) -> 'Interval':
         """
-        Initialize the base extractor with common settings.
-        """
-        # Set up directory structure
-        self.base_dir = Path(__file__).resolve().parent.parent.parent
-        self.raw_data_dir = self.base_dir / "src" / "data" / "raw"
-        self.processed_data_dir = self.base_dir / "src" / "data" / "processed"
+        Convert string to Interval enum.
         
-        # Create directories if they don't exist
+        Parameters
+        ----------
+        interval : str
+            Interval string to convert
+            
+        Returns
+        -------
+        Interval
+            Corresponding Interval enum value
+            
+        Raises
+        ------
+        ValueError
+            If interval is not supported
+        """
+        try:
+            return cls(interval)
+        except ValueError:
+            valid_intervals = [i.value for i in cls]
+            raise ValueError(
+                f"Invalid interval: {interval}. "
+                f"Supported intervals are: {', '.join(valid_intervals)}"
+            )
+
+class BaseExtractor(ABC):
+    """
+    Base financial data extractor implementing Template Method pattern.
+    
+    Attributes
+    ----------
+    REQUIRED_COLUMNS : List[str]
+        Required columns for price data
+    DEFAULT_INTERVAL : str
+        Default time interval for data
+    """
+    
+    REQUIRED_COLUMNS = ['Open', 'High', 'Low', 'Close', 'Volume']
+    DEFAULT_INTERVAL = Interval.DAILY
+    DEFAULT_SOURCE = DataSource.YAHOO
+    
+    def __init__(
+            self,
+            symbols:Union[str, List[str]],
+            start_date:datetime = datetime.now() - timedelta(days=3650),
+            end_date:datetime = datetime.now(),
+            source:DataSource = DEFAULT_SOURCE,
+            interval:Interval = DEFAULT_INTERVAL
+        ):
+        """Initialize the base extractor with common settings."""
+        self.symbols = symbols
+        self.start_date = start_date
+        self.end_date = end_date
+        self.source = source
+        self.interval = interval
+        self._setup_directories()
+    
+    def _setup_directories(self):
+        """Set up data directories with source and date-specific folders"""
+        # Base directory setup
+        self.base_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
+        
+        # Main data directories
+        self.raw_data_dir = self.base_dir / "data" / "raw"
+        self.processed_data_dir = self.base_dir / "data" / "processed"
+        
+        # Ensure base directories exist
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
         self.processed_data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Set up source-specific directories with current date
+        if hasattr(self, 'source'):
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            # Raw data directory for current source and date
+            self.current_raw_dir = self.raw_data_dir / self.source.value / today
+            self.current_raw_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Processed data directory for current source and date
+            self.current_processed_dir = self.processed_data_dir / self.source.value / today
+            self.current_processed_dir.mkdir(parents=True, exist_ok=True)
     
     @abstractmethod
-    def get_historical_prices(
+    def extract_data(
         self,
-        symbol: str,
+        symbol: Union[str, List[str]],
         start_date: datetime,
         end_date: datetime,
-        interval: str = "1d",
-        include_adj: bool = True
+        interval: str = "1d"
     ) -> pd.DataFrame:
         """
         Get historical price data for a single symbol.
@@ -73,9 +168,9 @@ class BaseExtractor(ABC):
         pass
 
     @abstractmethod
-    def format_historical_prices(
+    def format_extract_data(
         self,
-        raw_data: Dict[str, any],
+        raw_data: pd.DataFrame,
         symbol: str
     ) -> pd.DataFrame:
         """
@@ -120,6 +215,7 @@ class BaseExtractor(ABC):
         ValueError
             If dates are invalid or in wrong order
         """
+       
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("start_date and end_date must be datetime objects")
         
@@ -129,69 +225,58 @@ class BaseExtractor(ABC):
         if end_date > datetime.now():
             raise ValueError("end_date cannot be in the future")
     
-    def clean_price_data(
-        self,
-        df: pd.DataFrame,
-        symbol: str,
-        fill_method: str = 'ffill'
-    ) -> pd.DataFrame:
+    def save_raw_data(self, data: pd.DataFrame, filename: str) -> None:
         """
-        Clean and validate price data.
+        Save raw data to CSV file in source and date-specific directory.
         
         Parameters
         ----------
-        df : pd.DataFrame
-            Raw price data to clean
-        symbol : str
-            Symbol for the data being cleaned
-        fill_method : str, optional
-            Method for filling missing values, by default 'ffill'
-            
-        Returns
-        -------
-        pd.DataFrame
-            Cleaned price data
+        data : pd.DataFrame
+            Data to save
+        filename : str
+            Name of the file to save
             
         Raises
         ------
         ValueError
-            If data validation fails
+            If saving fails
         """
-        if df.empty:
-            raise ValueError(f"No data available for {symbol}")
+        try:
+            if not hasattr(self, 'current_raw_dir'):
+                self._setup_directories()
             
-        # Ensure required columns
-        required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-        missing_cols = [col for col in required_cols if col not in df.columns]
-
-        if missing_cols:
-            raise ValueError(f"Missing required columns for {symbol}: {missing_cols}")
+            file_path = self.current_raw_dir / filename
             
-        # Sort by date
-        df = df.sort_index()
+            print(f"Saving raw data to {file_path}")
+            data.to_csv(file_path)
+            
+        except Exception as e:
+            raise ValueError(f"Failed to save raw data to {filename}: {str(e)}") from e
         
-        # Remove duplicates
-        df = df[~df.index.duplicated(keep='first')]
+    def save_processed_data(self, data: pd.DataFrame, filename: str) -> None:
+        """
+        Save processed data to CSV file in source and date-specific directory.
         
-        # Handle missing values
-        df = df.fillna(method=fill_method)
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Data to save
+        filename : str
+            Name of the file to save
+            
+        Raises
+        ------
+        ValueError
+            If saving fails
+        """
+        try:
+            if not hasattr(self, 'current_processed_dir'):
+                self._setup_directories()
+            
+            file_path = self.current_processed_dir / filename
+            
+            data.to_csv(file_path)
+            
+        except Exception as e:
+            raise ValueError(f"Failed to save processed data to {filename}: {str(e)}") from e
         
-        # Validate price relationships
-        invalid_prices = (
-            (df['High'] < df['Low']) |
-            (df['Close'] < df['Low']) |
-            (df['Close'] > df['High']) |
-            (df['Open'] < df['Low']) |
-            (df['Open'] > df['High'])
-        )
-        if invalid_prices.any():
-            logger.warning(f"Found {invalid_prices.sum()} invalid price relationships for {symbol}")
-            df = df[~invalid_prices]
-        
-        # Convert volume to int
-        df['Volume'] = df['Volume'].fillna(0).astype(int)
-        
-        # Add metadata
-        df['Symbol'] = symbol
-        
-        return df
