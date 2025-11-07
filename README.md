@@ -103,4 +103,4 @@ cd Master-Miax-Tarea-Bloque1-Introduccion
 python -m venv .venv
 call .venv/Scripts/activate
 pip install -r requirements.txt
-python -m examples.quickstart_priceseries
+python -m examples.quickstart_price_series
